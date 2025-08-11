@@ -12,7 +12,12 @@ import tqdm
 from PIL import Image
 
 import histoprep.functional as F
-from histoprep._backend import CziBackend, OpenSlideBackend, PillowBackend
+from histoprep._backend import (
+    CziBackend,
+    OpenSlideBackend,
+    PillowBackend,
+    PyVipsBackend,
+)
 from histoprep._data import SpotCoordinates, TileCoordinates
 from histoprep.functional._concurrent import close_pool, prepare_worker_pool
 from histoprep.functional._level import format_level
@@ -593,7 +598,7 @@ class RegionData:
 
 def _read_slide(  # noqa
     path: Union[str, Path], backend: Optional[str] = None
-) -> Union[CziBackend, OpenSlideBackend, PillowBackend]:
+) -> Union[CziBackend, OpenSlideBackend, PillowBackend, PyVipsBackend]:
     """Read slide with the requested backend.
 
     Args:
@@ -615,7 +620,11 @@ def _read_slide(  # noqa
     if backend is None:
         # Based on file-extension.
         if path.name.endswith(OPENSLIDE_READABLE_FORMATS):
-            return OpenSlideBackend(path)
+            try:
+                return OpenSlideBackend(path)
+            except Exception as e:  # noqa: E501
+                # Fallback to PyVips if OpenSlide fails.
+                return PyVipsBackend(path)
         if path.name.endswith(("jpeg", "jpg")):
             return PillowBackend(path)
         if path.name.endswith("czi"):
@@ -625,12 +634,14 @@ def _read_slide(  # noqa
         # Based on backend argument.
         if "PIL" in backend.upper():
             return PillowBackend(path)
+        if "PYVIPS" in backend.upper():
+            return PyVipsBackend(path)
         if "OPEN" in backend.upper():
             return OpenSlideBackend(path)
         if "CZI" in backend.upper() or "ZEISS" in backend.upper():
             return CziBackend(path)
     if isinstance(
-        backend, (type(CziBackend), type(OpenSlideBackend), type(PillowBackend))
+        backend, (type(CziBackend), type(OpenSlideBackend), type(PillowBackend), type(PyVipsBackend))
     ):
         return backend(path=path)
     raise ValueError(ERROR_BACKEND_NAME.format(backend, AVAILABLE_BACKENDS))

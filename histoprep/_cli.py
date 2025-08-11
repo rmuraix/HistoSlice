@@ -129,7 +129,7 @@ def glob_pattern(*args) -> list[Path]:
 )
 @click.option(  # backend
     "--backend",
-    type=click.Choice(choices=["PIL", "OPENSLIDE", "CZI"], case_sensitive=False),
+    type=click.Choice(choices=["PIL", "OPENSLIDE", "CZI", "PYVIPS"], case_sensitive=False),
     default=DEFAULT_OPTIONS["backend"],
     show_default="automatic",
     help="Backend for reading slides.",
