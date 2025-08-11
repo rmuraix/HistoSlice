@@ -44,6 +44,7 @@ TILE_OPTIONS = [
 SAVE_OPTIONS = [
     "--metrics",
     "--masks",
+    "--thumbnails",
     "--overwrite",
     "--unfinished",
     "--image-format",
@@ -84,6 +85,7 @@ DEFAULT_OPTIONS = {
     "sigma": 1.0,
     "save_metrics": False,
     "save_masks": False,
+    "save_thumbnails": False,
     "overwrite": False,
     "overwrite_unfinished": False,
     "image_format": "jpeg",
@@ -242,6 +244,13 @@ def glob_pattern(*args) -> list[Path]:
     is_flag=True,
     help="Save tissue masks.",
 )
+@click.option(  # save_masks
+    "--thumbnails",
+    "save_thumbnails",
+    show_default="False",
+    is_flag=True,
+    help="Save thumbnails of tiles.",
+)
 @click.option(  # overwrite
     "-z",
     "--overwrite",
@@ -302,6 +311,7 @@ def cut_slides(
     # Tile saving.
     save_metrics: bool = False,
     save_masks: bool = False,
+    save_thumbnails: bool = False,
     overwrite: bool = False,
     overwrite_unfinished: bool = False,
     image_format: str = "jpeg",
@@ -338,7 +348,7 @@ def cut_slides(
             "level": level,
             "save_metrics": save_metrics,
             "save_masks": save_masks,
-            "save_thumbnails": True,
+            "save_thumbnails": save_thumbnails,
             "image_format": image_format,
             "quality": quality,
             "use_csv": use_csv,
