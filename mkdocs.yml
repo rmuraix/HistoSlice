@@ -1,0 +1,41 @@
+site_name: HistoSlice
+site_url: https://lab.ramurai.com/histoslice
+site_author: Ryota Murai
+site_description: Read and process histological slide images with python!
+repo_url: https://github.com/rmuraix/HistoSlice
+repo_name: rmuraix/HistoSlice
+copyright: Copyright &copy; 2025 Ryota Murai
+theme:
+  name: "material"
+  palette:
+    scheme: slate
+    primary: indigo
+  features:
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.indexes
+    - navigation.top
+  icon:
+    repo: fontawesome/brands/github
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/rmuraix/HistoSlice
+markdown_extensions:
+  - abbr
+  - admonition
+  - footnotes
+  - attr_list
+  - md_in_html
+  - pymdownx.highlight:
+      use_pygments: true
+      pygments_style: github-dark
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.blocks.caption
+plugins:
+  - search
+  - mkdocstrings
