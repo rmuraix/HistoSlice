@@ -4,8 +4,8 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-from histoprep import SlideReader
-from histoprep.utils import (
+from histoslice import SlideReader
+from histoslice.utils import (
     SlideReaderDataset,
     TileImageDataset,
 )

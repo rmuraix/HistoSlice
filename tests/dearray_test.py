@@ -2,8 +2,8 @@ import warnings
 
 import pytest
 
-import histoprep as hp
-import histoprep.functional as F
+import histoslice as hp
+import histoslice.functional as F
 from tests._utils import SLIDE_PATH_TMA
 
 IMAGE = hp.SlideReader(SLIDE_PATH_TMA).read_level(-1)

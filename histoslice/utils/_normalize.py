@@ -8,7 +8,7 @@ from typing import Union
 
 import numpy as np
 
-from histoprep.functional._normalize import (
+from histoslice.functional._normalize import (
     adjust_stain_concentrations,
     check_and_copy_image,
     get_macenko_stain_matrix,

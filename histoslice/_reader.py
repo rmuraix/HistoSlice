@@ -11,17 +11,17 @@ import polars as pl
 import tqdm
 from PIL import Image
 
-import histoprep.functional as F
-from histoprep._backend import (
+import histoslice.functional as F
+from histoslice._backend import (
     CziBackend,
     OpenSlideBackend,
     PillowBackend,
     PyVipsBackend,
 )
-from histoprep._data import SpotCoordinates, TileCoordinates
-from histoprep.functional._concurrent import close_pool, prepare_worker_pool
-from histoprep.functional._level import format_level
-from histoprep.functional._tiles import _multiply_xywh
+from histoslice._data import SpotCoordinates, TileCoordinates
+from histoslice.functional._concurrent import close_pool, prepare_worker_pool
+from histoslice.functional._level import format_level
+from histoslice.functional._tiles import _multiply_xywh
 
 ERROR_WRONG_TYPE = "Expected '{}' to be of type {}, not {}."
 ERROR_NO_THRESHOLD = "Threshold argument is required to save masks/metrics."

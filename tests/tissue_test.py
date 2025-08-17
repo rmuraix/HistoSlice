@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-import histoprep.functional as F
-from histoprep import SlideReader
+import histoslice.functional as F
+from histoslice import SlideReader
 from tests._utils import IMAGE, SLIDE_PATH_TMA
 
 

@@ -6,10 +6,10 @@ import pytest
 from openslide import OpenSlideUnsupportedFormatError
 from PIL import Image, UnidentifiedImageError
 
-import histoprep.functional as F
-from histoprep import SlideReader
-from histoprep._backend import CziBackend, OpenSlideBackend, PillowBackend
-from histoprep._data import SpotCoordinates, TileCoordinates
+import histoslice.functional as F
+from histoslice import SlideReader
+from histoslice._backend import CziBackend, OpenSlideBackend, PillowBackend
+from histoslice._data import SpotCoordinates, TileCoordinates
 
 from ._utils import (
     DATA_DIRECTORY,

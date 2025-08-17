@@ -12,8 +12,8 @@ from typing import Any, Optional, Union
 import numpy as np
 from PIL import Image
 
-from histoprep._backend import CziBackend
-from histoprep._reader import SlideReader
+from histoslice._backend import CziBackend
+from histoslice._reader import SlideReader
 
 try:
     from torch.utils.data import Dataset

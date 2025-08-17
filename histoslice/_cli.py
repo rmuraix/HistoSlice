@@ -11,7 +11,7 @@ from typing import NoReturn, Optional, Union
 import mpire
 import rich_click as click
 
-from histoprep import SlideReader
+from histoslice import SlideReader
 
 # Rich-click options.
 click.rich_click.USE_RICH_MARKUP = True

@@ -1,7 +1,7 @@
 import shutil
 from pathlib import Path
 
-from histoprep import SlideReader
+from histoslice import SlideReader
 
 DATA_DIRECTORY = Path(__file__).parent / "data"
 TMP_DIRECTORY = DATA_DIRECTORY.parent / "tmp"
