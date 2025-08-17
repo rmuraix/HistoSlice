@@ -1,6 +1,6 @@
 import numpy as np
 
-from histoprep import functional as F
+from histoslice import functional as F
 
 
 def test_grayscale_metrics() -> None:

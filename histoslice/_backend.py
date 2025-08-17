@@ -11,8 +11,12 @@ import numpy as np
 from aicspylibczi import CziFile
 from PIL import Image
 
-from histoprep.functional._level import format_level
-from histoprep.functional._tiles import _divide_xywh, _get_allowed_dimensions, _pad_tile
+from histoslice.functional._level import format_level
+from histoslice.functional._tiles import (
+    _divide_xywh,
+    _get_allowed_dimensions,
+    _pad_tile,
+)
 
 try:
     import openslide

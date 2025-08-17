@@ -10,7 +10,10 @@ import polars as pl
 from PIL import Image
 from sklearn.cluster import MiniBatchKMeans
 
-from histoprep.functional._images import create_image_collage, read_images_from_paths
+from histoslice.functional._images import (
+    create_image_collage,
+    read_images_from_paths,
+)
 
 ERROR_NO_METRICS = (
     "Metadata does not contain any metrics, make sure tiles are saved "

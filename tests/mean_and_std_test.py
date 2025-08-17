@@ -1,5 +1,5 @@
-import histoprep.functional as F
-from histoprep import SlideReader
+import histoslice.functional as F
+from histoslice import SlideReader
 
 from ._utils import SLIDE_PATH_JPEG, TMP_DIRECTORY, clean_temporary_directory
 

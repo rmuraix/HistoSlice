@@ -2,8 +2,8 @@ import numpy as np
 import polars as pl
 import pytest
 
-from histoprep import SlideReader
-from histoprep.utils import OutlierDetector
+from histoslice import SlideReader
+from histoslice.utils import OutlierDetector
 
 from ._utils import SLIDE_PATH_JPEG, TMP_DIRECTORY, clean_temporary_directory
 

@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from histoprep import SlideReader
-from histoprep import functional as F
+from histoslice import SlideReader
+from histoslice import functional as F
 
 from ._utils import DATA_DIRECTORY, SLIDE_PATH_JPEG
 

@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.scripts]
-HistoSlice = "histoprep._cli:cut_slides"
+HistoSlice = "histoslice._cli:cut_slides"
 
 [dependency-groups]
 dev = [
@@ -35,4 +35,3 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-

@@ -1,8 +1,8 @@
 import numpy as np
 
-import histoprep.functional as F
-from histoprep import SlideReader
-from histoprep.utils import MachenkoStainNormalizer, VahadaneStainNormalizer
+import histoslice.functional as F
+from histoslice import SlideReader
+from histoslice.utils import MachenkoStainNormalizer, VahadaneStainNormalizer
 
 from ._utils import IMAGE, SLIDE_PATH_SVS
 
