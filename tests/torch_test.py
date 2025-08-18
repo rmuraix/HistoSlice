@@ -1,8 +1,15 @@
 from pathlib import Path
 
 import numpy as np
-import torch
-from torch.utils.data import DataLoader, Dataset
+import pytest
+
+try:  # optional dependency for tests
+    import torch
+    from torch.utils.data import DataLoader, Dataset
+    HAS_TORCH = True
+except Exception:  # pragma: no cover - import guard
+    HAS_TORCH = False
+    torch = None  # type: ignore
 
 from histoslice import SlideReader
 from histoslice.utils import (
@@ -16,10 +23,14 @@ from ._utils import (
     SLIDE_PATH_SVS,
     TMP_DIRECTORY,
     clean_temporary_directory,
+    HAS_CZI_ASSET,
+    HAS_OPENSLIDE_ASSET,
 )
 
 
 def test_posix_paths() -> None:
+    if not HAS_TORCH:
+        return pytest.skip("PyTorch is not installed")
     clean_temporary_directory()
     reader = SlideReader(SLIDE_PATH_JPEG)
     metadata = reader.save_regions(TMP_DIRECTORY, reader.get_tile_coordinates(None, 96))
@@ -32,12 +43,14 @@ def test_posix_paths() -> None:
 
 
 def test_reader_dataset_loader_pil() -> None:
+    if not HAS_TORCH:
+        return pytest.skip("PyTorch is not installed")
     reader = SlideReader(SLIDE_PATH_JPEG)
     __, tissue_mask = reader.get_tissue_mask()
     coords = reader.get_tile_coordinates(tissue_mask, 512, max_background=0.01)
     dataset = SlideReaderDataset(reader, coords, level=1, transform=lambda z: z)
     assert isinstance(dataset, Dataset)
-    loader = DataLoader(dataset, batch_size=4, num_workers=10, drop_last=True)
+    loader = DataLoader(dataset, batch_size=4, num_workers=0, drop_last=True)
     for i, (batch_images, batch_coords) in enumerate(loader):
         assert batch_images.shape == (4, 256, 256, 3)
         assert isinstance(batch_images, torch.Tensor)
@@ -48,12 +61,16 @@ def test_reader_dataset_loader_pil() -> None:
 
 
 def test_reader_dataset_loader_openslide() -> None:
+    if not HAS_TORCH:
+        return pytest.skip("PyTorch is not installed")
+    if not HAS_OPENSLIDE_ASSET:
+        return pytest.skip("OpenSlide test data or dependency missing")
     reader = SlideReader(SLIDE_PATH_SVS)
     __, tissue_mask = reader.get_tissue_mask()
     coords = reader.get_tile_coordinates(tissue_mask, 512, max_background=0.01)
     dataset = SlideReaderDataset(reader, coords, level=1, transform=lambda z: z)
     assert isinstance(dataset, Dataset)
-    loader = DataLoader(dataset, batch_size=4, num_workers=10, drop_last=True)
+    loader = DataLoader(dataset, batch_size=4, num_workers=0, drop_last=True)
     for i, (batch_images, batch_coords) in enumerate(loader):
         assert batch_images.shape == (4, 256, 256, 3)
         assert isinstance(batch_images, torch.Tensor)
@@ -64,6 +81,10 @@ def test_reader_dataset_loader_openslide() -> None:
 
 
 def test_reader_dataset_loader_czi() -> None:
+    if not HAS_TORCH:
+        return pytest.skip("PyTorch is not installed")
+    if not HAS_CZI_ASSET:
+        return pytest.skip("CZI test data or dependency missing")
     reader = SlideReader(SLIDE_PATH_CZI)
     __, tissue_mask = reader.get_tissue_mask()
     coords = reader.get_tile_coordinates(tissue_mask, 512, max_background=0.01)
@@ -71,7 +92,7 @@ def test_reader_dataset_loader_czi() -> None:
     # happen here as there is some voodoo shit going on with `Dataset` & `DataLoader`...
     dataset = SlideReaderDataset(reader, coords, level=1, transform=lambda z: z)
     assert isinstance(dataset, Dataset)
-    loader = DataLoader(dataset, batch_size=4, num_workers=10, drop_last=True)
+    loader = DataLoader(dataset, batch_size=4, num_workers=0, drop_last=True)
     for i, (batch_images, batch_coords) in enumerate(loader):
         assert batch_images.shape == (4, 256, 256, 3)
         assert isinstance(batch_images, torch.Tensor)
@@ -82,6 +103,8 @@ def test_reader_dataset_loader_czi() -> None:
 
 
 def test_tile_dataset_loader() -> None:
+    if not HAS_TORCH:
+        return pytest.skip("PyTorch is not installed")
     clean_temporary_directory()
     reader = SlideReader(SLIDE_PATH_JPEG)
     metadata = reader.save_regions(TMP_DIRECTORY, reader.get_tile_coordinates(None, 96))
@@ -100,6 +123,8 @@ def test_tile_dataset_loader() -> None:
 
 
 def test_tile_dataset_cache() -> None:
+    if not HAS_TORCH:
+        return pytest.skip("PyTorch is not installed")
     clean_temporary_directory()
     reader = SlideReader(SLIDE_PATH_JPEG)
     metadata = reader.save_regions(TMP_DIRECTORY, reader.get_tile_coordinates(None, 96))

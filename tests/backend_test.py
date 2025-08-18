@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import pytest
-from aicspylibczi import CziFile
-from openslide import OpenSlide, OpenSlideUnsupportedFormatError
 from PIL import Image, UnidentifiedImageError
 
 from histoslice._backend import CziBackend, OpenSlideBackend, PillowBackend
@@ -10,6 +8,10 @@ from tests._utils import (
     SLIDE_PATH_CZI,
     SLIDE_PATH_JPEG,
     SLIDE_PATH_SVS,
+    HAS_CZI,
+    HAS_OPENSLIDE,
+    HAS_CZI_ASSET,
+    HAS_OPENSLIDE_ASSET,
 )
 
 
@@ -45,18 +47,26 @@ def read_invalid_level(
 
 def test_pillow_init() -> None:
     __ = PillowBackend(SLIDE_PATH_JPEG)
+    if not HAS_CZI_ASSET:
+        pytest.skip("CZI test data or dependency missing")
     with pytest.raises(UnidentifiedImageError):
         __ = PillowBackend(SLIDE_PATH_CZI)
 
 
 def test_czi_init() -> None:
+    if not HAS_CZI_ASSET:
+        pytest.skip("CZI test data or dependency missing")
     __ = CziBackend(SLIDE_PATH_CZI)
     with pytest.raises(RuntimeError):
         __ = CziBackend(SLIDE_PATH_JPEG)
 
 
 def test_openslide_init() -> None:
+    if not HAS_OPENSLIDE_ASSET:
+        pytest.skip("OpenSlide test data or dependency missing")
     __ = OpenSlideBackend(SLIDE_PATH_SVS)
+    # Import error type only when openslide is available
+    from openslide import OpenSlideUnsupportedFormatError
     with pytest.raises(OpenSlideUnsupportedFormatError):
         __ = OpenSlideBackend(SLIDE_PATH_JPEG)
 
@@ -82,41 +92,57 @@ def test_read_level_pillow() -> None:
 
 
 def test_zero_region_czi() -> None:
+    if not HAS_CZI_ASSET:
+        pytest.skip("CZI test data or dependency missing")
     backend = CziBackend(SLIDE_PATH_CZI)
     read_zero_sized_region(backend)
 
 
 def test_invalid_level_czi() -> None:
+    if not HAS_CZI_ASSET:
+        pytest.skip("CZI test data or dependency missing")
     backend = CziBackend(SLIDE_PATH_CZI)
     read_invalid_level(backend)
 
 
 def test_read_region_czi() -> None:
+    if not HAS_CZI_ASSET:
+        pytest.skip("CZI test data or dependency missing")
     backend = CziBackend(SLIDE_PATH_CZI)
     read_region_from_all_levels(backend)
 
 
 def test_read_level_czi() -> None:
+    if not HAS_CZI_ASSET:
+        pytest.skip("CZI test data or dependency missing")
     backend = CziBackend(SLIDE_PATH_CZI)
     assert backend.read_level(-1).shape == (1047, 1160, 3)
 
 
 def test_zero_region_openslide() -> None:
+    if not HAS_OPENSLIDE_ASSET:
+        pytest.skip("OpenSlide test data or dependency missing")
     backend = OpenSlideBackend(SLIDE_PATH_SVS)
     read_zero_sized_region(backend)
 
 
 def test_invalid_level_openslide() -> None:
+    if not HAS_OPENSLIDE_ASSET:
+        pytest.skip("OpenSlide test data or dependency missing")
     backend = OpenSlideBackend(SLIDE_PATH_SVS)
     read_invalid_level(backend)
 
 
 def test_read_region_openslide() -> None:
+    if not HAS_OPENSLIDE_ASSET:
+        pytest.skip("OpenSlide test data or dependency missing")
     backend = OpenSlideBackend(SLIDE_PATH_SVS)
     read_region_from_all_levels(backend)
 
 
 def test_read_level_openslide() -> None:
+    if not HAS_OPENSLIDE_ASSET:
+        pytest.skip("OpenSlide test data or dependency missing")
     backend = OpenSlideBackend(SLIDE_PATH_SVS)
     assert backend.read_level(-1).shape == (1867, 1904, 3)
 
@@ -136,6 +162,8 @@ def test_properties_pillow() -> None:
 
 
 def test_properties_czi() -> None:
+    if not HAS_CZI_ASSET:
+        pytest.skip("CZI test data or dependency missing")
     backend = CziBackend(SLIDE_PATH_CZI)
     assert backend.path == str(SLIDE_PATH_CZI)
     assert backend.name == "slide"
@@ -164,10 +192,14 @@ def test_properties_czi() -> None:
         7: (128.11567877629062, 128.0655737704918),
     }
     assert backend.data_bounds == (0, 0, 148428, 134009)
+    # Import type only when dependency is present
+    from aicspylibczi import CziFile
     assert isinstance(backend.reader, CziFile)
 
 
 def test_openslide_properties() -> None:
+    if not HAS_OPENSLIDE_ASSET:
+        pytest.skip("OpenSlide test data or dependency missing")
     backend = OpenSlideBackend(SLIDE_PATH_SVS)
     assert backend.path == str(SLIDE_PATH_SVS)
     assert backend.name == "slide"
@@ -186,4 +218,5 @@ def test_openslide_properties() -> None:
         2: (16.001606855918585, 16.0),
     }
     assert backend.data_bounds == (0, 0, 30464, 29875)
+    from openslide import OpenSlide
     assert isinstance(backend.reader, OpenSlide)

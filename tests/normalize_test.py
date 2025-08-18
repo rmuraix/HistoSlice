@@ -1,13 +1,17 @@
 import numpy as np
+import pytest
 
 import histoslice.functional as F
 from histoslice import SlideReader
 from histoslice.utils import MachenkoStainNormalizer, VahadaneStainNormalizer
 
-from ._utils import IMAGE, SLIDE_PATH_SVS
+from ._utils import IMAGE, SLIDE_PATH_SVS, HAS_OPENSLIDE_ASSET
 
 IMAGE_1 = IMAGE
-IMAGE_2 = SlideReader(SLIDE_PATH_SVS).read_level(-1)[500:1000, 500:1000, :]
+if HAS_OPENSLIDE_ASSET:
+    IMAGE_2 = SlideReader(SLIDE_PATH_SVS).read_level(-1)[500:1000, 500:1000, :]
+else:
+    IMAGE_2 = None  # type: ignore[assignment]
 
 
 def test_macenko_stain_matrix() -> None:
@@ -32,12 +36,16 @@ def test_vahadane_stain_matrix() -> None:
 
 def test_macenko_normalizer_fit() -> None:
     norm = MachenkoStainNormalizer()
+    if IMAGE_2 is None:
+        return pytest.skip("OpenSlide test data or dependency missing")
     norm.fit(IMAGE_2)
     assert norm.normalize(IMAGE_1).shape == IMAGE_1.shape
 
 
 def test_macenko_normalizer_fit_with_mask() -> None:
     norm = MachenkoStainNormalizer()
+    if IMAGE_2 is None:
+        return pytest.skip("OpenSlide test data or dependency missing")
     norm.fit(IMAGE_2, tissue_mask=F.get_tissue_mask(IMAGE_2)[1])
     assert norm.normalize(IMAGE_1).shape == IMAGE_1.shape
 
@@ -49,12 +57,16 @@ def test_macenko_normalizer_no_fit() -> None:
 
 def test_vahadane_normalizer_fit() -> None:
     norm = VahadaneStainNormalizer()
+    if IMAGE_2 is None:
+        return pytest.skip("OpenSlide test data or dependency missing")
     norm.fit(IMAGE_2)
     assert norm.normalize(IMAGE_1).shape == IMAGE_1.shape
 
 
 def test_vahadane_normalizer_fit_with_mask() -> None:
     norm = VahadaneStainNormalizer()
+    if IMAGE_2 is None:
+        return pytest.skip("OpenSlide test data or dependency missing")
     norm.fit(IMAGE_2, tissue_mask=F.get_tissue_mask(IMAGE_2)[1])
     assert norm.normalize(IMAGE_1).shape == IMAGE_1.shape
 

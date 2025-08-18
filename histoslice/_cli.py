@@ -350,17 +350,26 @@ def cut_slides(
         },
     }
     # Process.
-    with mpire.WorkerPool(n_jobs=num_workers) as pool:
-        for path, exception in pool.imap(
-            func=functools.partial(cut_slide, **kwargs),
-            iterable_of_args=paths,
-            progress_bar=True,
-            progress_bar_options={"desc": "Cutting slides"},
-        ):
+    # Serial path for restricted environments (e.g., CI sandboxes)
+    if num_workers == 0:
+        for path in paths:
+            __, exception = cut_slide(path, **kwargs)
             if isinstance(exception, Exception):
                 warning(
                     f"Could not process {path} due to exception: {exception.__repr__()}"
                 )
+    else:
+        with mpire.WorkerPool(n_jobs=num_workers) as pool:
+            for path, exception in pool.imap(
+                func=functools.partial(cut_slide, **kwargs),
+                iterable_of_args=paths,
+                progress_bar=True,
+                progress_bar_options={"desc": "Cutting slides"},
+            ):
+                if isinstance(exception, Exception):
+                    warning(
+                        f"Could not process {path} due to exception: {exception.__repr__()}"
+                    )
 
 
 def filter_slide_paths(  # noqa
