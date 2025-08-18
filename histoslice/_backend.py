@@ -8,7 +8,14 @@ from typing import (
 
 import cv2
 import numpy as np
-from aicspylibczi import CziFile
+try:
+    from aicspylibczi import CziFile
+    HAS_CZI = True
+    CZI_ERROR = None
+except Exception as e:  # pragma: no cover - import guard
+    CziFile = None  # type: ignore
+    HAS_CZI = False
+    CZI_ERROR = e
 from PIL import Image
 
 from histoslice.functional._level import format_level
@@ -47,6 +54,10 @@ Image.MAX_IMAGE_PIXELS = 20_000 * 20_000
 ERROR_OPENSLIDE_IMPORT = (
     "Could not import `openslide-python`, make sure `OpenSlide` is installed "
     "(https://openslide.org/api/python/)."
+)
+ERROR_CZI_IMPORT = (
+    "Could not import `aicspylibczi`. Install with `pip install aicspylibczi` "
+    "and ensure libCZI prerequisites are available."
 )
 ERROR_NON_MOSAIC = "HistoPrep does not support reading non-mosaic czi-files."
 BACKGROUND_COLOR = (1.0, 1.0, 1.0)
@@ -155,8 +166,10 @@ class CziBackend(SlideReaderBackend):
         Raises:
             NotImplementedError: Image is a non-mosaic czi-file.
         """
+        if not HAS_CZI:
+            raise ImportError(ERROR_CZI_IMPORT) from CZI_ERROR
         super().__init__(path)
-        self.__reader = CziFile(path)
+        self.__reader = CziFile(path)  # type: ignore[name-defined]
         if not self.__reader.is_mosaic():
             raise NotImplementedError(ERROR_NON_MOSAIC)
         # Get plane constraints.
@@ -175,7 +188,7 @@ class CziBackend(SlideReaderBackend):
             lvl += 1
 
     @property
-    def reader(self) -> CziFile:
+    def reader(self) -> "CziFile":  # type: ignore[name-defined]
         """CziFile instance."""
         return self.__reader
 
