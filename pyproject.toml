@@ -3,6 +3,25 @@ name = "histoslice"
 version = "0.1.0"
 description = "Read and process histological slide images with python!"
 authors = [{ name = "Ryota Murai", email = "opensource@rmurai.com" }]
+license = "MIT"
+license-files = ["LICENSE", "NOTICE.md"]
+keywords = [
+    "histology",
+    "slide",
+    "image processing",
+    "Whole Slide Imaging",
+    "WSI",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+]
 requires-python = "~=3.9"
 readme = "README.md"
 dependencies = [
@@ -19,6 +38,13 @@ dependencies = [
     "tqdm",
     "pyvips>=3,<4",
 ]
+
+[project.urls]
+Homepage = "https://github.com/rmuraix/HistoSlice"
+Documentation = "https://lab.rmurai.com/HistoSlice/"
+Repository = "https://github.com/rmuraix/HistoSlice.git"
+Issues = "https://github.com/rmuraix/HistoSlice/issues"
+Changelog = "https://github.com/rmuraix/HistoSlice/releases"
 
 [project.scripts]
 HistoSlice = "histoslice._cli:cut_slides"
