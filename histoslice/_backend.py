@@ -8,8 +8,10 @@ from typing import (
 
 import cv2
 import numpy as np
+
 try:
     from aicspylibczi import CziFile
+
     HAS_CZI = True
     CZI_ERROR = None
 except Exception as e:  # pragma: no cover - import guard
@@ -37,6 +39,7 @@ except ImportError as error:
 
 try:
     import pyvips
+
     HAS_PYVIPS = True
     PYVIPS_ERROR = None
 except Exception as e:  # pragma: no cover - import guard
@@ -181,8 +184,9 @@ class CziBackend(SlideReaderBackend):
         self.__level_dimensions, self.__level_downsamples = {}, {}
         while lvl == 0 or max(slide_w, slide_h) // 2**lvl >= self.MIN_LEVEL_DIMENSION:
             level_h, level_w = (slide_h // 2**lvl, slide_w // 2**lvl)
-            self.__level_dimensions[lvl] = round(slide_h / 2**lvl), round(
-                slide_w / 2**lvl
+            self.__level_dimensions[lvl] = (
+                round(slide_h / 2**lvl),
+                round(slide_w / 2**lvl),
             )
             self.__level_downsamples[lvl] = slide_h / level_h, slide_w / level_w
             lvl += 1
@@ -326,7 +330,8 @@ class OpenSlideBackend(SlideReaderBackend):
         tile = np.array(tile)[..., :3]  # only rgb channels
         # Pad tile.
         return _pad_tile(tile, shape=(h, w))
-    
+
+
 class PyVipsBackend(SlideReaderBackend):
     """Slide reader using `pyvips` (libvips) as a backend.
 
@@ -430,7 +435,11 @@ class PyVipsBackend(SlideReaderBackend):
     def read_level(self, level: int) -> np.ndarray:
         level = format_level(level, available=list(self.level_dimensions))
         page = self._page(level)
-        arr = np.ndarray(buffer=page.write_to_memory(), dtype=np.uint8, shape=[page.height, page.width, page.bands])
+        arr = np.ndarray(
+            buffer=page.write_to_memory(),
+            dtype=np.uint8,
+            shape=[page.height, page.width, page.bands],
+        )
         # Ensure RGB
         if arr.shape[2] > 3:
             arr = arr[..., :3]
@@ -451,7 +460,9 @@ class PyVipsBackend(SlideReaderBackend):
 
         # Bound the requested region against the slide bounds at level 0, but
         # expressed in level coordinates for cropping.
-        allowed_h0, allowed_w0 = _get_allowed_dimensions((x, y, w_l, h_l), self.dimensions)
+        allowed_h0, allowed_w0 = _get_allowed_dimensions(
+            (x, y, w_l, h_l), self.dimensions
+        )
         # allowed_* are sizes at the *requested level* per the upstream helper,
         # but to be safe, clamp again to the level's own dimensions.
         level_h, level_w = self.level_dimensions[level]

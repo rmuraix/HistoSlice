@@ -8,8 +8,6 @@ from tests._utils import (
     SLIDE_PATH_CZI,
     SLIDE_PATH_JPEG,
     SLIDE_PATH_SVS,
-    HAS_CZI,
-    HAS_OPENSLIDE,
     HAS_CZI_ASSET,
     HAS_OPENSLIDE_ASSET,
 )
@@ -67,6 +65,7 @@ def test_openslide_init() -> None:
     __ = OpenSlideBackend(SLIDE_PATH_SVS)
     # Import error type only when openslide is available
     from openslide import OpenSlideUnsupportedFormatError
+
     with pytest.raises(OpenSlideUnsupportedFormatError):
         __ = OpenSlideBackend(SLIDE_PATH_JPEG)
 
@@ -194,6 +193,7 @@ def test_properties_czi() -> None:
     assert backend.data_bounds == (0, 0, 148428, 134009)
     # Import type only when dependency is present
     from aicspylibczi import CziFile
+
     assert isinstance(backend.reader, CziFile)
 
 
@@ -219,4 +219,5 @@ def test_openslide_properties() -> None:
     }
     assert backend.data_bounds == (0, 0, 30464, 29875)
     from openslide import OpenSlide
+
     assert isinstance(backend.reader, OpenSlide)

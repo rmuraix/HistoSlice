@@ -67,6 +67,7 @@ def test_reader_init_openslide() -> None:
     __ = SlideReader(SLIDE_PATH_SVS, backend="open")
     __ = SlideReader(SLIDE_PATH_SVS, backend="openSLIDe")
     from openslide import OpenSlideUnsupportedFormatError
+
     with pytest.raises(OpenSlideUnsupportedFormatError):
         __ = SlideReader(SLIDE_PATH_JPEG, backend="openslide")
 
@@ -276,9 +277,9 @@ def test_save_regions() -> None:
         ]
     )
     expected = ["x{}_y{}_w{}_h{}.jpeg".format(*xywh) for xywh in regions]
-    assert sorted([
-        f.name for f in (TMP_DIRECTORY / reader.name / "tiles").iterdir()
-    ]) == sorted(expected)
+    assert sorted(
+        [f.name for f in (TMP_DIRECTORY / reader.name / "tiles").iterdir()]
+    ) == sorted(expected)
     clean_temporary_directory()
 
 
@@ -308,9 +309,9 @@ def test_save_regions_tiles() -> None:
         ]
     )
     expected = ["x{}_y{}_w{}_h{}.jpeg".format(*xywh) for xywh in tile_coords]
-    assert sorted([
-        f.name for f in (TMP_DIRECTORY / reader.name / "tiles").iterdir()
-    ]) == sorted(expected)
+    assert sorted(
+        [f.name for f in (TMP_DIRECTORY / reader.name / "tiles").iterdir()]
+    ) == sorted(expected)
     clean_temporary_directory()
 
 
@@ -333,9 +334,9 @@ def test_save_regions_spots() -> None:
         "{}_x{}_y{}_w{}_h{}.jpeg".format(name, *xywh)
         for name, xywh in zip(spot_coords.spot_names, spot_coords)
     ]
-    assert sorted([
-        f.name for f in (TMP_DIRECTORY / reader.name / "spots").iterdir()
-    ]) == sorted(expected)
+    assert sorted(
+        [f.name for f in (TMP_DIRECTORY / reader.name / "spots").iterdir()]
+    ) == sorted(expected)
     clean_temporary_directory()
 
 
@@ -404,9 +405,9 @@ def test_save_regions_with_masks() -> None:
     )
     assert "mask_path" in metadata.columns
     expected = ["x{}_y{}_w{}_h{}.png".format(*xywh) for xywh in regions]
-    assert sorted([
-        f.name for f in (TMP_DIRECTORY / reader.name / "masks").iterdir()
-    ]) == sorted(expected)
+    assert sorted(
+        [f.name for f in (TMP_DIRECTORY / reader.name / "masks").iterdir()]
+    ) == sorted(expected)
     clean_temporary_directory()
 
 

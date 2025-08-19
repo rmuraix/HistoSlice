@@ -19,6 +19,7 @@ def clean_temporary_directory() -> None:
     if TMP_DIRECTORY.exists():
         shutil.rmtree(TMP_DIRECTORY)
 
+
 # Optional dependency flags and asset availability
 HAS_CZI = importlib.util.find_spec("aicspylibczi") is not None
 HAS_OPENSLIDE = importlib.util.find_spec("openslide") is not None

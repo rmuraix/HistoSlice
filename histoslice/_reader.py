@@ -622,7 +622,7 @@ def _read_slide(  # noqa
         if path.name.endswith(OPENSLIDE_READABLE_FORMATS):
             try:
                 return OpenSlideBackend(path)
-            except Exception as e:  # noqa: E501
+            except Exception:  # noqa: E501
                 # Fallback to PyVips if OpenSlide fails.
                 return PyVipsBackend(path)
         if path.name.endswith(("jpeg", "jpg")):
@@ -641,7 +641,13 @@ def _read_slide(  # noqa
         if "CZI" in backend.upper() or "ZEISS" in backend.upper():
             return CziBackend(path)
     if isinstance(
-        backend, (type(CziBackend), type(OpenSlideBackend), type(PillowBackend), type(PyVipsBackend))
+        backend,
+        (
+            type(CziBackend),
+            type(OpenSlideBackend),
+            type(PillowBackend),
+            type(PyVipsBackend),
+        ),
     ):
         return backend(path=path)
     raise ValueError(ERROR_BACKEND_NAME.format(backend, AVAILABLE_BACKENDS))
