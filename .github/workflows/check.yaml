@@ -1,0 +1,31 @@
+name: Check
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+      - name: Install packages
+        run: uv sync
+      - name: Run Ruff
+        run: uv run ruff check --output-format=github .
+      - name: Run Ruff format
+        run: uv run ruff format --check .
+      - name: Test with pytest
+        run: uv run pytest
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: rmuraix/HistoSlice

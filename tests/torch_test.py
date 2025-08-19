@@ -6,6 +6,7 @@ import pytest
 try:  # optional dependency for tests
     import torch
     from torch.utils.data import DataLoader, Dataset
+
     HAS_TORCH = True
 except Exception:  # pragma: no cover - import guard
     HAS_TORCH = False

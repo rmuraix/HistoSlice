@@ -61,7 +61,7 @@ dev = [
 
 [tool.pytest.ini_options]
 norecursedirs = "test/data/*"
-addopts = "--doctest-modules --cov=histoslice"
+addopts = "--doctest-modules --cov=histoslice --cov-branch --cov-report=xml"
 script_launch_mode = "subprocess"
 
 [build-system]

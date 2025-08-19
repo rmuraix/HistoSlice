@@ -151,7 +151,7 @@ def _get_channel_quantiles(
     output = {}
     bins = np.cumsum(np.bincount(channel[tissue_mask == 1].flatten(), minlength=256))
     for q in quantiles:
-        output[f"{name}_q{int(100*q)}"] = int(
+        output[f"{name}_q{int(100 * q)}"] = int(
             np.argwhere(bins > int(q * (tissue_mask == 1).sum()))[0]
         )
     return output

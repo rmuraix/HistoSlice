@@ -59,7 +59,7 @@ def get_spot_coordinates(
             elif sum(matches) > 1:
                 same_spot_number = True
                 numbers[matches] = [
-                    f"{current_number}-{version+1}" for version in range(sum(matches))
+                    f"{current_number}-{version + 1}" for version in range(sum(matches))
                 ]
             current_number += 1
     if same_spot_number:
