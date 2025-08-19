@@ -8,10 +8,28 @@ This project was forked from [HistoPrep](https://github.com/jopo666/HistoPrep), 
 
 ## Installation
 
-Install [`OpenSlide`](https://openslide.org/download/) on your system and then install HistoSlice with `uv` or `pip`!
+Install install HistoSlice with `uv` or `pip`!
 
 ```bash
-# WIP
+uv add histoslice
+# or
+pip install histoslice
+```
+
+Or install latest development version from GitHub:
+
+```bash
+uv add git+https://github.com/rmuraix/HistoSlice
+# or
+pip install git+https://github.com/rmuraix/HistoSlice
+```
+
+Alternatively, you can install the package from source:
+
+```bash
+git clone https://github.com/rmuraix/HistoSlice.git
+cd HistoSlice
+uv sync
 ```
 
 ## Usage
@@ -19,6 +37,8 @@ Install [`OpenSlide`](https://openslide.org/download/) on your system and then i
 ### Cutting Slide Images
 
 Cut each slide image into smaller tile images.
+
+`HistoSlice --help` will show you all available options. For Python API usage, see the [API documentation](api/public/slidereader/). 
 
 === "CLI"
     ```bash
@@ -90,3 +110,5 @@ reader.get_annotated_thumbnail(
 Now we can mark tiles in cluster `0` as outliers!
 
 ![Tiles in cluster 0](https://github.com/rmuraix/HistoSlice/blob/main/images/thumbnail_blue.jpeg?raw=true)
+
+For more information on how to use the `OutlierDetector`, see the [API documentation](api/public/outlierdetector/).
