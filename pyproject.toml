@@ -22,21 +22,21 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering",
 ]
-requires-python = "~=3.9"
+requires-python = ">=3.10"
 readme = "README.md"
 dependencies = [
     "aicspylibczi>=3,<4",
     "matplotlib",
-    "mpire~=2.6",
-    "numpy",
-    "opencv-python-headless>=4,<5",
-    "openslide-python~=1.2",
-    "pillow>=10,<11",
-    "polars>=0.16,<0.17",
-    "rich-click~=1.6",
+    "mpire>=2.6",
+    "numpy>=2",
+    "opencv-python-headless>=4",
+    "openslide-python>=1.2",
+    "pillow>=10",
+    "polars>=0.16",
+    "rich-click>=1.6",
     "scikit-learn>=1,<2",
-    "tqdm",
-    "pyvips>=3,<4",
+    "tqdm>=4.66.0",
+    "pyvips>=3.0.0",
 ]
 
 [project.urls]
@@ -51,12 +51,12 @@ HistoSlice = "histoslice._cli:cut_slides"
 
 [dependency-groups]
 dev = [
-    "mkdocs-material>=9.6.17",
-    "mkdocstrings[python]>=0.30.0",
-    "pytest",
-    "pytest-console-scripts>=1.3.1,<2",
-    "pytest-cov>=6.2.1",
-    "ruff>=0.12.8",
+    "mkdocs-material==9.6.17",
+    "mkdocstrings[python]==0.30.0",
+    "pytest==8.4.1",
+    "pytest-console-scripts==1.4.1",
+    "pytest-cov==6.2.1",
+    "ruff==0.12.8",
 ]
 
 [tool.pytest.ini_options]
