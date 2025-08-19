@@ -43,7 +43,7 @@ jobs:
       - name: Install dependencies
         run: uv sync --only-dev
       - name: Build documentation
-        run: uv run mkdocs build
+        run: uv run mkdocs build --only-dev
       - name: Setup Pages
         uses: actions/configure-pages@v5
         if: ${{ github.event_name != 'pull_request' }}
