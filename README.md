@@ -38,7 +38,7 @@ HistoSlice --input './train_images/*.tiff' --output ./tiles --width 512 --overla
 Or you can use the `HistoSlice` python API to do the same thing!
 
 ```python
-from HistoSlice import SlideReader
+from histoslice import SlideReader
 
 # Read slide image.
 reader = SlideReader("./slides/slide_with_ink.jpeg")
@@ -80,7 +80,7 @@ we would not like to include into our training data. Might seem like a daunting 
 let's try it out!
 
 ```python
-from HistoSlice.utils import OutlierDetector
+from histoslice.utils import OutlierDetector
 
 # Let's wrap the tile metadata with a helper class.
 detector = OutlierDetector(tile_metadata)
