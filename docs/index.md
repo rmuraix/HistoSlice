@@ -1,5 +1,8 @@
 # HistoSlice Documentation
 
+[![PyPI - Version](https://img.shields.io/pypi/v/histoslice)](https://pypi.org/project/histoslice/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/histoslice)](https://pypi.org/project/histoslice/)
+
 ## Overview
 
 `HistoSlice` makes is easy to prepare your histological slide images for deep learning models. You can easily cut large slide images into smaller tiles and then preprocess those tiles (remove tiles with shitty tissue, finger marks etc).
@@ -53,7 +56,7 @@ Cut each slide image into smaller tile images.
     ```
 === "Python API"
     ```python
-    from HistoSlice import SlideReader
+    from histoslice import SlideReader
 
     # Read slide image.
     reader = SlideReader("./parh/to/slide_image.tiff")
@@ -95,7 +98,7 @@ tiles
 Histological slide images often contain areas that we would not like to include into our training data. Might seem like a daunting task but let's try it out!
 
 ```python
-from HistoSlice.utils import OutlierDetector
+from histoslice.utils import OutlierDetector
 
 # Let's wrap the tile metadata with a helper class.
 detector = OutlierDetector(tile_metadata)

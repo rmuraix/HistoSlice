@@ -2,7 +2,19 @@
 
 # HistoSlice
 
+[![PyPI - Version](https://img.shields.io/pypi/v/histoslice)](https://pypi.org/project/histoslice/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/histoslice)](https://pypi.org/project/histoslice/)
+[![GitHub License](https://img.shields.io/github/license/rmuraix/HistoSlice)](./LICENSE)
+[![Check](https://github.com/rmuraix/HistoSlice/actions/workflows/check.yaml/badge.svg)](https://github.com/rmuraix/HistoSlice/actions/workflows/check.yaml)
+[![Docs](https://github.com/rmuraix/HistoSlice/actions/workflows/docs.yaml/badge.svg)](https://github.com/rmuraix/HistoSlice/actions/workflows/docs.yaml)
+[![codecov](https://codecov.io/github/rmuraix/HistoSlice/graph/badge.svg?token=NDSf4tDhzF)](https://codecov.io/github/rmuraix/HistoSlice)
+
 Preprocessing large medical images for machine learning made easy!
+
+<p align="center">
+  <a href="https://lab.rmurai.com/HistoSlice/">Documentation</a> •
+  <a href="https://pypi.org/project/histoslice/">PyPI</a>
+</p>
 
 </div>
 
@@ -17,10 +29,10 @@ preprocess those tiles (remove tiles with shitty tissue, finger marks etc).
 
 ## Installation
 
-Install [`OpenSlide`](https://openslide.org/download/) on your system and then install HistoSlice with `uv` or `pip`!
-
 ```bash
-# WIP
+uv add histoslice
+# or
+pip install histoslice
 ```
 
 ## Usage
@@ -38,7 +50,7 @@ HistoSlice --input './train_images/*.tiff' --output ./tiles --width 512 --overla
 Or you can use the `HistoSlice` python API to do the same thing!
 
 ```python
-from HistoSlice import SlideReader
+from histoslice import SlideReader
 
 # Read slide image.
 reader = SlideReader("./slides/slide_with_ink.jpeg")
@@ -80,7 +92,7 @@ we would not like to include into our training data. Might seem like a daunting 
 let's try it out!
 
 ```python
-from HistoSlice.utils import OutlierDetector
+from histoslice.utils import OutlierDetector
 
 # Let's wrap the tile metadata with a helper class.
 detector = OutlierDetector(tile_metadata)
