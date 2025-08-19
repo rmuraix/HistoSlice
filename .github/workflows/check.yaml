@@ -2,8 +2,23 @@ name: Check
 on:
   push:
     branches: [main]
+    paths:
+      - "histoslice/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - ".github/workflows/check.yaml"
   pull_request:
     branches: [main]
+    paths:
+      - "histoslice/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".python-version"
+      - ".github/workflows/check.yaml"
+
 jobs:
   check:
     runs-on: ubuntu-latest
