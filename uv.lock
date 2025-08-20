@@ -568,10 +568,11 @@ dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.3.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "opencv-python-headless" },
+    { name = "openslide-bin" },
     { name = "openslide-python" },
     { name = "pillow" },
     { name = "polars" },
-    { name = "pyvips" },
+    { name = "pyvips", extra = ["binary"] },
     { name = "rich-click" },
     { name = "scikit-learn" },
     { name = "tqdm" },
@@ -594,10 +595,11 @@ requires-dist = [
     { name = "mpire", specifier = ">=2.6" },
     { name = "numpy", specifier = ">=2" },
     { name = "opencv-python-headless", specifier = ">=4" },
-    { name = "openslide-python", specifier = ">=1.2" },
+    { name = "openslide-bin", specifier = ">=4.0.0.2" },
+    { name = "openslide-python", specifier = ">=1.4" },
     { name = "pillow", specifier = ">=10" },
     { name = "polars", specifier = ">=0.16" },
-    { name = "pyvips", specifier = ">=3.0.0" },
+    { name = "pyvips", extras = ["binary"], specifier = ">=3.0.0" },
     { name = "rich-click", specifier = ">=1.6" },
     { name = "scikit-learn", specifier = ">=1,<2" },
     { name = "tqdm", specifier = ">=4.66.0" },
@@ -1242,6 +1244,18 @@ wheels = [
 ]
 
 [[package]]
+name = "openslide-bin"
+version = "4.0.0.8"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/61/49/0a62d150b620bf045ddf1e70ae90e42e423aefdc07b4927d846faefcca19/openslide-bin-4.0.0.8.tar.gz", hash = "sha256:bae3b5e374ada9d6b5110d19f60a71e1d164578be98c46c0761c028dec8949e4", size = 17872279 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f9/4b/d527b317dddd9fe17addf16a49eed0907943590228ccf2d2f535e541e928/openslide_bin-4.0.0.8-py3-none-macosx_11_0_universal2.whl", hash = "sha256:9389cf7bb1b4ecd9e79e6d00151ae6a43a1e8b07ce7119609324d9260345f3c7", size = 5372459 },
+    { url = "https://files.pythonhosted.org/packages/8c/be/f4028886d0e2bc4f4114bfa929427ec29a6be86831327f131d423fde041c/openslide_bin-4.0.0.8-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:79c94c39a48d497caa39ecdad5ef64a931b31c6592354a142497bc3db2e88494", size = 4221147 },
+    { url = "https://files.pythonhosted.org/packages/d7/a0/7255bfd87c47b18f29fe78719b1e9fd075624c8d7cb957d65b951468cc38/openslide_bin-4.0.0.8-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:d9cb149af1a5c2eddbc0e3b75f552d932a840689f011d53724912de37071cc40", size = 4327171 },
+    { url = "https://files.pythonhosted.org/packages/b1/05/c01a0c145ba88b19acd9874693774e6bedb7aa1bb1fa4c0b40e1bc42851e/openslide_bin-4.0.0.8-py3-none-win_amd64.whl", hash = "sha256:a06abf5b6f7807fa7aad2b240496a1d825cbd885267d521458eacbcfd782ed44", size = 4176324 },
+]
+
+[[package]]
 name = "openslide-python"
 version = "1.4.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1484,6 +1498,32 @@ dependencies = [
     { name = "cffi" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/4c/a2/d8ecd2f7ffa084870ba071a584aac44800a89f3c77b305999be7dc8b7bb3/pyvips-3.0.0.tar.gz", hash = "sha256:79459975e4a16089b0eaafed26eb1400ae66ebc16d3ff3a7d2241abcf19dc9e8", size = 56806 }
+
+[package.optional-dependencies]
+binary = [
+    { name = "pyvips-binary" },
+]
+
+[[package]]
+name = "pyvips-binary"
+version = "8.17.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cffi" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/80/4f/3c4945974278b6c6dbef90eb90c732fae3f637966b50c60a6c0ed365ebef/pyvips_binary-8.17.1.tar.gz", hash = "sha256:678975eb6649e5a442e1b431ae565842f0c656263243c5917ef9533a2c1bf45e", size = 3759 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/94/48/d5b2c382d51d1a1eb7a9f19aa1240dcc8eea2faa04ec9f544dd9d2952fd7/pyvips_binary-8.17.1-cp37-abi3-macosx_10_15_x86_64.whl", hash = "sha256:bc7d5d8acec9b8d8ce77eb23863c725edbf1e21d9a81f44ed97ca91882dc319e", size = 8136553 },
+    { url = "https://files.pythonhosted.org/packages/aa/28/70ca46d35795d6d275092ea0c9285586dbe980033eac86ee8ff41954bdaa/pyvips_binary-8.17.1-cp37-abi3-macosx_11_0_arm64.whl", hash = "sha256:78fde47a722dff3ed7de90efc0b12be406dad23ab93675bf0f12129e58942506", size = 7248311 },
+    { url = "https://files.pythonhosted.org/packages/ed/64/1ea2a4cbac602b4d2f3b31acf6eb3368ccb6f063002fc17d11738d1643da/pyvips_binary-8.17.1-cp37-abi3-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:92ebc40b54109f9b74a4a8154e4a089d2e420450caabe902eca2a3d5efe7de80", size = 7409778 },
+    { url = "https://files.pythonhosted.org/packages/8d/72/749bba2249e4b12b72366b65ef4f062bc8dfa33532412ccbac122b9cb580/pyvips_binary-8.17.1-cp37-abi3-manylinux_2_27_armv7l.manylinux_2_31_armv7l.whl", hash = "sha256:ecde11ca25d494d3069b5e67d19af13fd8f4e1d2a852704740df3b30c7f09033", size = 7180503 },
+    { url = "https://files.pythonhosted.org/packages/a5/cb/12841696964fbe05f7b069e5e82be45c8aa5d5bb9dc2267050704c96ca4e/pyvips_binary-8.17.1-cp37-abi3-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:323d8330b3b21ca5a9d44ef3faa5af8a6d6beae6c9622322ee9b1855a05beab4", size = 7328460 },
+    { url = "https://files.pythonhosted.org/packages/78/3a/cdb698ad5e7cd33d11d84a827ada609d9948012840f8da731f9c0c0d0845/pyvips_binary-8.17.1-cp37-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:8c77c8865e6cf2aaf08c0532bd71021bfb9765c1b61bfa91af20de5625ee184a", size = 7558665 },
+    { url = "https://files.pythonhosted.org/packages/13/1f/3e5e78f0070e43033aa39fd46f8132659a79b58644d485112596e263317b/pyvips_binary-8.17.1-cp37-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:217ad2db22f2e577f639246de3293b7ad13890aef70128894fbbbf61e7c9809d", size = 7441583 },
+    { url = "https://files.pythonhosted.org/packages/4f/cd/603dde01c7d6e0b8b8d7142d305a675771fe347faabeb751bb81c9b6bb7e/pyvips_binary-8.17.1-cp37-abi3-win32.whl", hash = "sha256:9da11c7a4913124db44d8a6a717ae737ea8f39bb5dfd1df6cfb37250d9f75c72", size = 8051640 },
+    { url = "https://files.pythonhosted.org/packages/3f/87/27a09666ef968e8ba21d5d9e704bac344a29877378c80c630de3449cf31a/pyvips_binary-8.17.1-cp37-abi3-win_amd64.whl", hash = "sha256:9ceba0edfaf777181b222d3b7a366c3a8545fd752dee4bcd8f9fe7a15b26367c", size = 8036807 },
+    { url = "https://files.pythonhosted.org/packages/a4/c6/42f2eeedf161a33da0063dcde281c5acc31d51602b52574495b31d1d66cd/pyvips_binary-8.17.1-cp37-abi3-win_arm64.whl", hash = "sha256:6e3024dc35c65e4e2bd48b0d36e7ef6c457c3d843c86b7dc36041a3c6aae8bdf", size = 7205933 },
+]
 
 [[package]]
 name = "pywin32"
