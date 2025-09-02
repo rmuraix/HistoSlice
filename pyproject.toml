@@ -52,7 +52,7 @@ HistoSlice = "histoslice._cli:cut_slides"
 
 [dependency-groups]
 dev = [
-    "mkdocs-material==9.6.17",
+    "mkdocs-material==9.6.18",
     "mkdocstrings[python]==0.30.0",
     "pytest==8.4.1",
     "pytest-console-scripts==1.4.1",
