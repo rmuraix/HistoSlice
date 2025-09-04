@@ -48,7 +48,7 @@ Issues = "https://github.com/rmuraix/HistoSlice/issues"
 Changelog = "https://github.com/rmuraix/HistoSlice/releases"
 
 [project.scripts]
-HistoSlice = "histoslice._cli:cut_slides"
+HistoSlice = "histoslice.cli._app:cut_slides"
 
 [dependency-groups]
 dev = [
