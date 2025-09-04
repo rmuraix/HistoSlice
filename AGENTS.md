@@ -13,7 +13,7 @@
 - **Lint/format**: `uv run ruff check .`
 - **Tests**: `uv run pytest -q` (doctests enabled via `pytest.ini`).
 - **Docs**: `uv run mkdocs serve` (live preview) or `uv run mkdocs build`.
-- **CLI (dev)**: `uv run HistoSlice --help` (use this while iterating locally).
+- **CLI (dev)**: `uv run histoslice --help` (use this while iterating locally).
 
 ## Coding Style & Naming Conventions
 
