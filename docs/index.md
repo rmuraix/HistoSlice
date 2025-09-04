@@ -41,11 +41,11 @@ uv sync
 
 Cut each slide image into smaller tile images.
 
-`HistoSlice --help` will show you all available options. For Python API usage, see the [API documentation](api/public/slidereader/). 
+`histoslice --help` will show you all available options. For Python API usage, see the [API documentation](api/public/slidereader/). 
 
 === "CLI"
     ```bash
-    HistoSlice \
+    histoslice \
         --input './images/*.tiff' \
         --output ./tiles \
         --width 512 \
