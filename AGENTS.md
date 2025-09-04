@@ -2,10 +2,10 @@
 
 ## Project Structure & Module Organization
 
-- `histoslice/`: core library. Key modules: `_reader.py`, `_backend.py`, `_data.py`; CLI in `_cli.py`; image ops in `functional/`.
+- `histoslice/`: core library. Key modules: `_reader.py`, `_backend.py`, `_data.py`; CLI in `cli/`; image ops in `functional/`.
 - `tests/`: pytest suite (`*_test.py`), helpers in `tests/_utils.py`, sample assets in `tests/data/`.
 - `docs/` + `mkdocs.yml`: user/API docs (MkDocs + mkdocstrings).
-- `pyproject.toml`: package metadata, Python `~=3.9`, dev tools; `uv.lock` indicates use of `uv` for env management.
+- `pyproject.toml`: package metadata, Python `>=3.10`, dev tools; `uv.lock` indicates use of `uv` for env management.
 
 ## Build, Test, and Development Commands
 
