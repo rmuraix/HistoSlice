@@ -44,7 +44,7 @@ following:
 2. Preprocess smaller tile images by removing tiles with bad tissue, staining artifacts.
 
 ```bash
-HistoSlice --input './train_images/*.tiff' --output ./tiles --width 512 --overlap 0.5 --max-background 0.5 --metrics --thumbnail
+histoslice --input './train_images/*.tiff' --output ./tiles --width 512 --overlap 0.5 --max-background 0.5 --metrics --thumbnail
 ```
 
 Or you can use the `HistoSlice` python API to do the same thing!
