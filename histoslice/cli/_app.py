@@ -82,7 +82,6 @@ def cut_slides(
         (os.cpu_count() or 1) if cfg.num_workers is None else cfg.num_workers
     )
 
-    # 5) 実行（元のロジックを忠実に移植）
     if effective_workers == 0:
         for path in paths:
             _, exception = cut_slide(path, **kwargs)
