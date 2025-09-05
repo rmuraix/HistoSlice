@@ -143,3 +143,77 @@ def test_unfinished(script_runner) -> None:  # noqa
         ]
     )
     clean_temporary_directory()
+
+
+def test_run_with_error_multi_process(script_runner, monkeypatch) -> None:  # noqa
+    cli = shutil.which("HistoSlice") or str(
+        (TMP_DIRECTORY.parent.parent / ".venv" / "bin" / "HistoSlice").resolve()
+    )
+    if not cli or not Path(cli).exists():
+        return pytest.skip("HistoSlice CLI not available in test environment")
+
+    def mock_cut_slide(path, **kwargs):
+        if "error_slide" in str(path):
+            return path, ValueError("Processing error")
+        from histoslice.cli._app import cut_slide as original_cut_slide
+
+        return original_cut_slide(path, **kwargs)
+
+    monkeypatch.setattr("histoslice.cli._app.cut_slide", mock_cut_slide)
+
+    clean_temporary_directory()
+    (TMP_DIRECTORY / "error_slide.jpeg").touch()
+
+    ret = script_runner.run(
+        [
+            cli,
+            "-i",
+            str(TMP_DIRECTORY / "*.jpeg"),
+            "-o",
+            str(TMP_DIRECTORY),
+            "-j",
+            "2",
+        ]
+    )
+
+    assert ret.success
+    assert "Could not process" in ret.stderr
+    assert "Processing error" in ret.stderr
+    clean_temporary_directory()
+
+
+def test_run_with_error_single_process(script_runner, monkeypatch) -> None:  # noqa
+    cli = shutil.which("HistoSlice") or str(
+        (TMP_DIRECTORY.parent.parent / ".venv" / "bin" / "HistoSlice").resolve()
+    )
+    if not cli or not Path(cli).exists():
+        return pytest.skip("HistoSlice CLI not available in test environment")
+
+    def mock_cut_slide(path, **kwargs):
+        if "error_slide" in str(path):
+            return path, ValueError("Processing error")
+        from histoslice.cli._app import cut_slide as original_cut_slide
+
+        return original_cut_slide(path, **kwargs)
+
+    monkeypatch.setattr("histoslice.cli._app.cut_slide", mock_cut_slide)
+
+    clean_temporary_directory()
+    (TMP_DIRECTORY / "error_slide.jpeg").touch()
+
+    ret = script_runner.run(
+        [
+            cli,
+            "-i",
+            str(TMP_DIRECTORY / "*.jpeg"),
+            "-o",
+            str(TMP_DIRECTORY),
+            "-j",
+            "0",
+        ]
+    )
+
+    assert ret.success
+    assert "Could not process" in ret.stderr
+    assert "Processing error" in ret.stderr
+    clean_temporary_directory()
