@@ -59,7 +59,7 @@ dev = [
     "mkdocstrings[python]==0.30.0",
     "pytest==8.4.2",
     "pytest-console-scripts==1.4.1",
-    "pytest-cov==6.2.1",
+    "pytest-cov==6.3.0",
     "ruff==0.13.0",
 ]
 
