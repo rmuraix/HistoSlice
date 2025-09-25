@@ -49,7 +49,7 @@ jobs:
         if: ${{ github.event_name != 'pull_request' }}
         id: pages
       - name: Upload pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         if: ${{ github.event_name != 'pull_request' }}
         with:
           path: site
