@@ -111,18 +111,18 @@ def _otsu_threshold(*, gray: np.ndarray) -> int:
     """Helper function to calculate Otsu's thresold from a grayscale image."""
     values = gray.flatten()
     values = values[(values != WHITE_PIXEL) & (values != BLACK_PIXEL)]
-    
+
     # Handle case where all pixels are black or white (empty array after filtering)
     if len(values) == 0:
         # Return a default threshold value when no valid pixels for Otsu calculation
         return 127  # Mid-range default threshold
-    
+
     # Ensure values array is properly formatted for cv2.threshold
     # Some OpenCV versions require proper array structure for OTSU method
     if len(values) == 1:
         # Single pixel case - return the pixel value as threshold
         return int(values[0])
-    
+
     threshold, __ = cv2.threshold(
         values, None, 1, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
     )
