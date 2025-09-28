@@ -55,6 +55,20 @@ def get_tissue_mask(
         threshold = _otsu_threshold(gray=blur)
         threshold = max(min(255, int(threshold * max(0.0, multiplier) + 0.5)), 0)
     # Global thresholding.
+    # Ensure the blur array is in a valid state for cv2.threshold
+    if blur.size == 0:
+        # Handle empty array case
+        mask = np.zeros_like(blur, dtype=np.uint8)
+        return threshold, mask
+    
+    # Ensure array is contiguous and properly formatted for OpenCV
+    if not blur.flags.c_contiguous:
+        blur = np.ascontiguousarray(blur)
+    
+    # Ensure proper data type
+    if blur.dtype != np.uint8:
+        blur = blur.astype(np.uint8)
+    
     thrsh, mask = cv2.threshold(blur, threshold, 1, cv2.THRESH_BINARY_INV)
     return int(thrsh), mask
 
@@ -135,6 +149,11 @@ def _gaussian_blur(
     """Apply gaussian blurring."""
     if sigma <= SIGMA_NO_OP:
         return image
+    
+    # Handle empty arrays that would cause GaussianBlur to fail
+    if image.size == 0:
+        return image
+    
     ksize = int(truncate * sigma + 0.5)
     if ksize % 2 == 0:
         ksize += 1
