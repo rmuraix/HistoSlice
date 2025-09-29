@@ -52,25 +52,19 @@ def get_tissue_mask(
     blur = _gaussian_blur(image=gray, sigma=sigma, truncate=3.5)
     # Get threshold.
     if threshold is None:
-        threshold = _otsu_threshold(gray=blur)
+        # Compute Otsu threshold on a downscaled image to avoid OpenCV limits
+        small_for_thr = _downscale_for_threshold(blur)
+        threshold = _otsu_threshold(gray=small_for_thr)
         threshold = max(min(255, int(threshold * max(0.0, multiplier) + 0.5)), 0)
-    # Global thresholding.
-    # Ensure the blur array is in a valid state for cv2.threshold
+    # Global thresholding: avoid cv2.threshold on gigantic arrays; use NumPy instead
     if blur.size == 0:
-        # Handle empty array case
         mask = np.zeros_like(blur, dtype=np.uint8)
-        return threshold, mask
-    
-    # Ensure array is contiguous and properly formatted for OpenCV
-    if not blur.flags.c_contiguous:
-        blur = np.ascontiguousarray(blur)
-    
-    # Ensure proper data type
+        return int(threshold), mask
     if blur.dtype != np.uint8:
         blur = blur.astype(np.uint8)
-    
-    thrsh, mask = cv2.threshold(blur, threshold, 1, cv2.THRESH_BINARY_INV)
-    return int(thrsh), mask
+    # OpenCV's THRESH_BINARY_INV sets 1 for values <= threshold
+    mask = (blur <= int(threshold)).astype(np.uint8)
+    return int(threshold), mask
 
 
 def clean_tissue_mask(
@@ -149,12 +143,38 @@ def _gaussian_blur(
     """Apply gaussian blurring."""
     if sigma <= SIGMA_NO_OP:
         return image
-    
+
     # Handle empty arrays that would cause GaussianBlur to fail
     if image.size == 0:
         return image
-    
+
     ksize = int(truncate * sigma + 0.5)
     if ksize % 2 == 0:
         ksize += 1
     return cv2.GaussianBlur(image, ksize=(ksize, ksize), sigmaX=sigma, sigmaY=sigma)
+
+
+def _downscale_for_threshold(
+    image: np.ndarray, *, max_pixels: int = 4_000_000
+) -> np.ndarray:
+    """Downscale image for threshold computation if too large.
+
+    Ensures the number of pixels does not exceed `max_pixels`.
+    Uses area interpolation for downscaling; leaves image unchanged if small enough.
+    """
+    # Guard against empty input
+    if image.size == 0:
+        return image
+    h, w = image.shape[:2]
+    total = int(h) * int(w)
+    if total <= max_pixels:
+        return image
+    # Compute uniform scale factor
+    scale = float(np.sqrt(max_pixels / float(total)))
+    # OpenCV expects contiguous uint8 for resize here
+    src = image if image.dtype == np.uint8 else image.astype(np.uint8)
+    if not src.flags.c_contiguous:
+        src = np.ascontiguousarray(src)
+    new_w = max(1, int(w * scale))
+    new_h = max(1, int(h * scale))
+    return cv2.resize(src, (new_w, new_h), interpolation=cv2.INTER_AREA)

@@ -3,6 +3,7 @@ import pytest
 
 import histoslice.functional as F
 from histoslice import SlideReader
+from histoslice.functional._tissue import _downscale_for_threshold
 from tests._utils import IMAGE, SLIDE_PATH_TMA
 
 
@@ -70,3 +71,39 @@ def test_tissue_mask_edge_cases() -> None:
     )
     assert thresh_no_blur == 127  # Should return default fallback threshold
     assert mask_no_blur.shape == black_white_image_no_blur.shape
+
+
+def test_downscale_for_threshold_small_noop() -> None:
+    img = (np.random.rand(100, 100) * 255).astype(np.uint8)
+    out = _downscale_for_threshold(img, max_pixels=4_000_000)
+    # Should return the original array (no resize)
+    assert out.shape == img.shape
+    assert out.dtype == np.uint8
+    assert np.array_equal(out, img)
+
+
+def test_downscale_for_threshold_large_scales_down() -> None:
+    h, w = 3000, 3000  # 9,000,000 px > 4,000,000
+    img = (np.random.rand(h, w) * 255).astype(np.uint8)
+    out = _downscale_for_threshold(img, max_pixels=4_000_000)
+    # Expected uniform scale factor
+    scale = np.sqrt(4_000_000 / float(h * w))
+    exp_w = max(1, int(w * scale))
+    exp_h = max(1, int(h * scale))
+    assert out.shape == (exp_h, exp_w)
+    assert out.size <= 4_000_000
+    assert out.dtype == np.uint8
+
+
+def test_downscale_for_threshold_dtype_cast_and_empty() -> None:
+    # Non-uint8 image is cast before resize
+    img_f = np.linspace(0, 1, 200 * 200, dtype=np.float32).reshape(200, 200)
+    out_f = _downscale_for_threshold(img_f, max_pixels=10_000)
+    # 200*200 = 40,000 > 10,000 -> expect downscale to ~100x100 (depending on rounding)
+    assert out_f.size <= 10_000
+    assert out_f.dtype == np.uint8
+
+    # Empty input stays empty
+    empty = np.zeros((0, 0), dtype=np.uint8)
+    out_e = _downscale_for_threshold(empty, max_pixels=1)
+    assert out_e.shape == (0, 0)
