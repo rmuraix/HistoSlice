@@ -51,6 +51,7 @@ Cut each slide image into smaller tile images.
         --width 512 \
         --overlap 0.5 \
         --max-background 0.5 \
+        --backend pyvips \
         --metrics \
         --thumbnail
     ```
