@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional, Union
 
+import cv2
 import numpy as np
 import polars as pl
 import tqdm
@@ -512,14 +513,34 @@ class SlideReader:
             if thumbnail_level is None:
                 thumbnail_level = self.level_from_max_dimension()
             thumbnail = self.read_level(thumbnail_level)
-            Image.fromarray(thumbnail).save(output_dir / "thumbnail.jpeg")
-            thumbnail_regions = self.get_annotated_thumbnail(thumbnail, coordinates)
+            
+            # Downscale thumbnail if too large to prevent JPEG size limits and reduce disk space
+            thumbnail_small = F.downscale_for_thumbnail(thumbnail)
+            
+            Image.fromarray(thumbnail_small).save(output_dir / "thumbnail.jpeg")
+            thumbnail_regions = self.get_annotated_thumbnail(thumbnail_small, coordinates)
             thumbnail_regions.save(output_dir / f"thumbnail_{image_dir}.jpeg")
             if (
                 isinstance(coordinates, (TileCoordinates, SpotCoordinates))
                 and coordinates.tissue_mask is not None
             ):
-                Image.fromarray(255 - 255 * coordinates.tissue_mask).save(
+                # For tissue mask, scale it to match the thumbnail dimensions if needed
+                original_tissue_mask = coordinates.tissue_mask
+                if thumbnail_small.shape[:2] != thumbnail.shape[:2]:
+                    # If thumbnail was downscaled, apply the same downscaling to tissue mask
+                    scale_h = thumbnail_small.shape[0] / thumbnail.shape[0]
+                    scale_w = thumbnail_small.shape[1] / thumbnail.shape[1]
+                    new_h = max(1, int(original_tissue_mask.shape[0] * scale_h))
+                    new_w = max(1, int(original_tissue_mask.shape[1] * scale_w))
+                    tissue_mask_resized = cv2.resize(
+                        original_tissue_mask.astype(np.uint8), 
+                        (new_w, new_h), 
+                        interpolation=cv2.INTER_AREA
+                    )
+                else:
+                    tissue_mask_resized = original_tissue_mask
+                
+                Image.fromarray(255 - 255 * tissue_mask_resized).save(
                     output_dir / "thumbnail_tissue.jpeg"
                 )
         metadata = _save_regions(
