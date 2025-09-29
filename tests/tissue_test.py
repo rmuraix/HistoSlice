@@ -24,6 +24,10 @@ def test_tissue_mask_threshold() -> None:
     thresh, mask = F.get_tissue_mask(IMAGE, threshold=210)
     assert thresh == 210
     assert mask.sum() == 192803
+    # Boundary condition: THRESH_BINARY_INV semantics are inclusive (<= threshold)
+    boundary = np.array([[209, 210, 211]], dtype=np.uint8)
+    __, bmask = F.get_tissue_mask(boundary, threshold=210, sigma=0.0)
+    assert bmask.tolist() == [[1, 1, 0]]
 
 
 def test_tissue_mask_bad_threshold() -> None:
