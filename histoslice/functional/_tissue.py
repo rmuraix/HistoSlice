@@ -163,7 +163,7 @@ def _downscale_for_threshold(
 
 
 def downscale_for_thumbnail(
-    image: np.ndarray, *, max_pixels: int = 1_000_000
+    image: np.ndarray, *, max_pixels: int = 3_000_000
 ) -> np.ndarray:
     """Downscale image for thumbnail generation if too large."""
     return downscale_to_max_pixels(image, max_pixels=max_pixels)
