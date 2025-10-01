@@ -204,14 +204,33 @@ def test_properties_czi() -> None:
     assert isinstance(backend.reader, CziFile)
 
 
-def test_openslide_properties() -> None:
-    if not HAS_OPENSLIDE_ASSET:
+@pytest.mark.parametrize(
+    "backend_class,backend_name,has_asset,reader_type",
+    [
+        (
+            OpenSlideBackend,
+            "OPENSLIDE",
+            "HAS_OPENSLIDE_ASSET",
+            "openslide.OpenSlide",
+        ),
+        (PyVipsBackend, "PYVIPS", "HAS_PYVIPS_ASSET", "pyvips.Image"),
+    ],
+)
+def test_tiff_backend_properties(
+    backend_class, backend_name, has_asset, reader_type
+) -> None:
+    """Test properties for backends that read the pyramidal TIFF asset."""
+    # Check if the asset and backend are available
+    if has_asset == "HAS_OPENSLIDE_ASSET" and not HAS_OPENSLIDE_ASSET:
         pytest.skip("OpenSlide test data or dependency missing")
-    backend = OpenSlideBackend(SLIDE_PATH_TIFF)
+    if has_asset == "HAS_PYVIPS_ASSET" and not HAS_PYVIPS_ASSET:
+        pytest.skip("PyVips test data or dependency missing")
+
+    backend = backend_class(SLIDE_PATH_TIFF)
     assert backend.path == str(SLIDE_PATH_TIFF)
     assert backend.name == "slide"
     assert backend.suffix == ".tiff"
-    assert backend.BACKEND_NAME == "OPENSLIDE"
+    assert backend.BACKEND_NAME == backend_name
     assert backend.level_count == 6
     assert backend.dimensions == (2500, 2500)
     assert backend.level_dimensions == {
@@ -231,9 +250,16 @@ def test_openslide_properties() -> None:
         5: (32.05128205128205, 32.05128205128205),
     }
     assert backend.data_bounds == (0, 0, 2500, 2500)
-    from openslide import OpenSlide
 
-    assert isinstance(backend.reader, OpenSlide)
+    # Check reader type
+    if reader_type == "openslide.OpenSlide":
+        from openslide import OpenSlide
+
+        assert isinstance(backend.reader, OpenSlide)
+    elif reader_type == "pyvips.Image":
+        import pyvips
+
+        assert isinstance(backend.reader, pyvips.Image)
 
 
 def test_pyvips_init() -> None:
@@ -274,35 +300,3 @@ def test_read_level_pyvips() -> None:
         pytest.skip("PyVips test data or dependency missing")
     backend = PyVipsBackend(SLIDE_PATH_TIFF)
     assert backend.read_level(-1).shape == (78, 78, 3)
-
-
-def test_pyvips_properties() -> None:
-    if not HAS_PYVIPS_ASSET:
-        pytest.skip("PyVips test data or dependency missing")
-    backend = PyVipsBackend(SLIDE_PATH_TIFF)
-    assert backend.path == str(SLIDE_PATH_TIFF)
-    assert backend.name == "slide"
-    assert backend.suffix == ".tiff"
-    assert backend.BACKEND_NAME == "PYVIPS"
-    assert backend.level_count == 6
-    assert backend.dimensions == (2500, 2500)
-    assert backend.level_dimensions == {
-        0: (2500, 2500),
-        1: (1250, 1250),
-        2: (625, 625),
-        3: (312, 312),
-        4: (156, 156),
-        5: (78, 78),
-    }
-    assert backend.level_downsamples == {
-        0: (1.0, 1.0),
-        1: (2.0, 2.0),
-        2: (4.0, 4.0),
-        3: (8.012820512820513, 8.012820512820513),
-        4: (16.025641025641026, 16.025641025641026),
-        5: (32.05128205128205, 32.05128205128205),
-    }
-    assert backend.data_bounds == (0, 0, 2500, 2500)
-    import pyvips
-
-    assert isinstance(backend.reader, pyvips.Image)
