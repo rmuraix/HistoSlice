@@ -88,3 +88,54 @@ def _read_image(path: Optional[str]) -> np.ndarray:
     if path is None:
         return None
     return np.array(Image.open(path))
+
+
+def downscale_to_max_pixels(
+    image: np.ndarray,
+    *,
+    max_pixels: int,
+    ensure_uint8: bool = True,
+    interpolation: int = cv2.INTER_AREA,
+) -> np.ndarray:
+    """Downscale an image uniformly so that total pixels <= max_pixels.
+
+    This is a shared utility function used by specific downscaling functions
+    (e.g., for thresholding or thumbnail generation).
+
+    Args:
+        image: Input image array (H, W[, C]).
+        max_pixels: Maximum allowed total number of pixels.
+        ensure_uint8: Convert to uint8 before resizing (recommended for OpenCV).
+        interpolation: Interpolation method (default: cv2.INTER_AREA, good for downscaling).
+
+    Returns:
+        Downscaled image if needed, otherwise the original image.
+    """
+    # Return immediately if the image is empty
+    if image.size == 0:
+        return image
+
+    h, w = image.shape[:2]
+    total = h * w
+
+    # Skip resizing if the total number of pixels is already below the limit
+    if total <= max_pixels:
+        return image
+
+    # Compute uniform scale factor so that total pixels <= max_pixels
+    scale = float(np.sqrt(max_pixels / float(total)))
+
+    # Ensure uint8 type if required (some OpenCV operations assume this)
+    src = image
+    if ensure_uint8 and src.dtype != np.uint8:
+        src = src.astype(np.uint8, copy=False)
+
+    # Ensure the array is C-contiguous for cv2.resize
+    if not src.flags.c_contiguous:
+        src = np.ascontiguousarray(src)
+
+    # Compute new dimensions (at least 1 pixel in each dimension)
+    new_w = max(1, int(w * scale))
+    new_h = max(1, int(h * scale))
+
+    return cv2.resize(src, (new_w, new_h), interpolation=interpolation)

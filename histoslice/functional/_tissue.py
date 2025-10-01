@@ -5,6 +5,7 @@ import numpy as np
 from PIL import Image
 
 from ._check import check_image
+from ._images import downscale_to_max_pixels
 
 ERROR_THRESHOLD = "Threshold should be in range [0, 255], got {}."
 
@@ -157,60 +158,12 @@ def _gaussian_blur(
 def _downscale_for_threshold(
     image: np.ndarray, *, max_pixels: int = 4_000_000
 ) -> np.ndarray:
-    """Downscale image for threshold computation if too large.
-
-    Ensures the number of pixels does not exceed `max_pixels`.
-    Uses area interpolation for downscaling; leaves image unchanged if small enough.
-    """
-    # Guard against empty input
-    if image.size == 0:
-        return image
-    h, w = image.shape[:2]
-    total = int(h) * int(w)
-    if total <= max_pixels:
-        return image
-    # Compute uniform scale factor
-    scale = float(np.sqrt(max_pixels / float(total)))
-    # OpenCV expects contiguous uint8 for resize here
-    src = image if image.dtype == np.uint8 else image.astype(np.uint8)
-    if not src.flags.c_contiguous:
-        src = np.ascontiguousarray(src)
-    new_w = max(1, int(w * scale))
-    new_h = max(1, int(h * scale))
-    return cv2.resize(src, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    """Downscale image for threshold computation if too large."""
+    return downscale_to_max_pixels(image, max_pixels=max_pixels)
 
 
 def downscale_for_thumbnail(
     image: np.ndarray, *, max_pixels: int = 1_000_000
 ) -> np.ndarray:
-    """Downscale image for thumbnail generation if too large.
-
-    Ensures the number of pixels does not exceed `max_pixels` to prevent
-    JPEG size limit issues and reduce disk space while maintaining visibility
-    for tile annotation review.
-    Uses area interpolation for downscaling; leaves image unchanged if small enough.
-
-    Args:
-        image: Input image array.
-        max_pixels: Maximum number of pixels allowed. Defaults to 1,000,000
-            (approximately 1000x1000 pixels).
-
-    Returns:
-        Downscaled image array.
-    """
-    # Guard against empty input
-    if image.size == 0:
-        return image
-    h, w = image.shape[:2]
-    total = int(h) * int(w)
-    if total <= max_pixels:
-        return image
-    # Compute uniform scale factor
-    scale = float(np.sqrt(max_pixels / float(total)))
-    # OpenCV expects contiguous uint8 for resize here
-    src = image if image.dtype == np.uint8 else image.astype(np.uint8)
-    if not src.flags.c_contiguous:
-        src = np.ascontiguousarray(src)
-    new_w = max(1, int(w * scale))
-    new_h = max(1, int(h * scale))
-    return cv2.resize(src, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    """Downscale image for thumbnail generation if too large."""
+    return downscale_to_max_pixels(image, max_pixels=max_pixels)

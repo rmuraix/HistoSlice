@@ -513,12 +513,14 @@ class SlideReader:
             if thumbnail_level is None:
                 thumbnail_level = self.level_from_max_dimension()
             thumbnail = self.read_level(thumbnail_level)
-            
+
             # Downscale thumbnail if too large to prevent JPEG size limits and reduce disk space
             thumbnail_small = F.downscale_for_thumbnail(thumbnail)
-            
+
             Image.fromarray(thumbnail_small).save(output_dir / "thumbnail.jpeg")
-            thumbnail_regions = self.get_annotated_thumbnail(thumbnail_small, coordinates)
+            thumbnail_regions = self.get_annotated_thumbnail(
+                thumbnail_small, coordinates
+            )
             thumbnail_regions.save(output_dir / f"thumbnail_{image_dir}.jpeg")
             if (
                 isinstance(coordinates, (TileCoordinates, SpotCoordinates))
@@ -533,13 +535,13 @@ class SlideReader:
                     new_h = max(1, int(original_tissue_mask.shape[0] * scale_h))
                     new_w = max(1, int(original_tissue_mask.shape[1] * scale_w))
                     tissue_mask_resized = cv2.resize(
-                        original_tissue_mask.astype(np.uint8), 
-                        (new_w, new_h), 
-                        interpolation=cv2.INTER_AREA
+                        original_tissue_mask.astype(np.uint8),
+                        (new_w, new_h),
+                        interpolation=cv2.INTER_AREA,
                     )
                 else:
                     tissue_mask_resized = original_tissue_mask
-                
+
                 Image.fromarray(255 - 255 * tissue_mask_resized).save(
                     output_dir / "thumbnail_tissue.jpeg"
                 )
