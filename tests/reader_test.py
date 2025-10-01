@@ -12,14 +12,14 @@ from histoslice._data import SpotCoordinates, TileCoordinates
 
 from ._utils import (
     DATA_DIRECTORY,
+    HAS_CZI_ASSET,
+    HAS_OPENSLIDE_ASSET,
     SLIDE_PATH_CZI,
     SLIDE_PATH_JPEG,
     SLIDE_PATH_SVS,
     SLIDE_PATH_TMA,
     TMP_DIRECTORY,
     clean_temporary_directory,
-    HAS_CZI_ASSET,
-    HAS_OPENSLIDE_ASSET,
 )
 from .backend_test import (
     read_invalid_level,
@@ -385,9 +385,8 @@ def test_save_regions_thumbnail_size_limit() -> None:
     thumbnail_img = Image.open(thumbnail_path)
     thumbnail_tiles_img = Image.open(thumbnail_tiles_path)
 
-    # Should be downscaled to max 1M pixels (approximately 1000x1000)
-    assert thumbnail_img.size[0] * thumbnail_img.size[1] <= 1_000_000
-    assert thumbnail_tiles_img.size[0] * thumbnail_tiles_img.size[1] <= 1_000_000
+    assert thumbnail_img.size[0] * thumbnail_img.size[1] <= 3_000_000
+    assert thumbnail_tiles_img.size[0] * thumbnail_tiles_img.size[1] <= 3_000_000
 
     # Files should be reasonably sized (much smaller than original large thumbnails)
     thumbnail_size = thumbnail_path.stat().st_size

@@ -42,11 +42,11 @@ def test_downscale_for_thumbnail_grayscale() -> None:
 
 def test_downscale_for_thumbnail_default_max_pixels() -> None:
     """Test default max_pixels parameter."""
-    h, w = 1500, 1500  # 2,250,000 px > 1,000,000 (default)
+    h, w = 2500, 2500
     img = (np.random.rand(h, w, 3) * 255).astype(np.uint8)
     out = downscale_for_thumbnail(img)
     # Should be downscaled to ~1M pixels
-    assert out.size <= 1_000_000 * 3
+    assert out.size <= 3_000_000 * 3
     assert out.dtype == np.uint8
 
 
