@@ -5,11 +5,11 @@ import histoslice.functional as F
 from histoslice import SlideReader
 from histoslice.utils import MachenkoStainNormalizer, VahadaneStainNormalizer
 
-from ._utils import IMAGE, SLIDE_PATH_SVS, HAS_OPENSLIDE_ASSET
+from ._utils import IMAGE, SLIDE_PATH_TIFF, HAS_OPENSLIDE_ASSET
 
 IMAGE_1 = IMAGE
 if HAS_OPENSLIDE_ASSET:
-    IMAGE_2 = SlideReader(SLIDE_PATH_SVS).read_level(-1)[500:1000, 500:1000, :]
+    IMAGE_2 = SlideReader(SLIDE_PATH_TIFF).read_level(-1)[20:70, 20:70, :]
 else:
     IMAGE_2 = None  # type: ignore[assignment]
 

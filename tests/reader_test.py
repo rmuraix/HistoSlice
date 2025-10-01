@@ -16,7 +16,7 @@ from ._utils import (
     HAS_OPENSLIDE_ASSET,
     SLIDE_PATH_CZI,
     SLIDE_PATH_JPEG,
-    SLIDE_PATH_SVS,
+    SLIDE_PATH_TIFF,
     SLIDE_PATH_TMA,
     TMP_DIRECTORY,
     clean_temporary_directory,
@@ -62,10 +62,10 @@ def test_reader_init_czi() -> None:
 def test_reader_init_openslide() -> None:
     if not HAS_OPENSLIDE_ASSET:
         pytest.skip("OpenSlide test data or dependency missing")
-    __ = SlideReader(SLIDE_PATH_SVS)
-    __ = SlideReader(SLIDE_PATH_SVS, backend=OpenSlideBackend)
-    __ = SlideReader(SLIDE_PATH_SVS, backend="open")
-    __ = SlideReader(SLIDE_PATH_SVS, backend="openSLIDe")
+    __ = SlideReader(SLIDE_PATH_TIFF)
+    __ = SlideReader(SLIDE_PATH_TIFF, backend=OpenSlideBackend)
+    __ = SlideReader(SLIDE_PATH_TIFF, backend="open")
+    __ = SlideReader(SLIDE_PATH_TIFF, backend="openSLIDe")
     from openslide import OpenSlideUnsupportedFormatError
 
     with pytest.raises(OpenSlideUnsupportedFormatError):
