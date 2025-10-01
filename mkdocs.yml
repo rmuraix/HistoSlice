@@ -39,3 +39,5 @@ markdown_extensions:
 plugins:
   - search
   - mkdocstrings
+  - mkdocs-typer2:
+      pretty: true
