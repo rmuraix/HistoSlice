@@ -12,14 +12,14 @@ from histoslice._data import SpotCoordinates, TileCoordinates
 
 from ._utils import (
     DATA_DIRECTORY,
+    HAS_CZI_ASSET,
+    HAS_OPENSLIDE_ASSET,
     SLIDE_PATH_CZI,
     SLIDE_PATH_JPEG,
     SLIDE_PATH_SVS,
     SLIDE_PATH_TMA,
     TMP_DIRECTORY,
     clean_temporary_directory,
-    HAS_CZI_ASSET,
-    HAS_OPENSLIDE_ASSET,
 )
 from .backend_test import (
     read_invalid_level,
@@ -366,6 +366,37 @@ def test_save_regions_no_thumbnails() -> None:
             "tiles",
         ]
     )
+
+
+def test_save_regions_thumbnail_size_limit() -> None:
+    """Test that thumbnails are properly downscaled to prevent size issues."""
+    reader = SlideReader(SLIDE_PATH_JPEG)
+    clean_temporary_directory()
+    regions = F.get_tile_coordinates(reader.dimensions, 512)
+    reader.save_regions(TMP_DIRECTORY, regions, save_thumbnails=True)
+
+    # Check that thumbnail files exist
+    thumbnail_path = TMP_DIRECTORY / reader.name / "thumbnail.jpeg"
+    thumbnail_tiles_path = TMP_DIRECTORY / reader.name / "thumbnail_tiles.jpeg"
+    assert thumbnail_path.exists()
+    assert thumbnail_tiles_path.exists()
+
+    # Check that thumbnail dimensions are limited to prevent size issues
+    thumbnail_img = Image.open(thumbnail_path)
+    thumbnail_tiles_img = Image.open(thumbnail_tiles_path)
+
+    assert thumbnail_img.size[0] * thumbnail_img.size[1] <= 3_000_000
+    assert thumbnail_tiles_img.size[0] * thumbnail_tiles_img.size[1] <= 3_000_000
+
+    # Files should be reasonably sized (much smaller than original large thumbnails)
+    thumbnail_size = thumbnail_path.stat().st_size
+    thumbnail_tiles_size = thumbnail_tiles_path.stat().st_size
+
+    # Should be less than 1MB each (much smaller than the 1.2MB we had before)
+    assert thumbnail_size < 1_000_000  # 1MB
+    assert thumbnail_tiles_size < 1_000_000  # 1MB
+
+    clean_temporary_directory()
 
 
 def test_save_regions_with_csv() -> None:

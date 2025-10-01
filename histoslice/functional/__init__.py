@@ -2,6 +2,7 @@
 
 __all__ = [
     "clean_tissue_mask",
+    "downscale_for_thumbnail",
     "get_annotated_image",
     "get_background_percentages",
     "get_downsample",
@@ -30,4 +31,4 @@ from ._tiles import (
     get_region_from_array,
     get_tile_coordinates,
 )
-from ._tissue import clean_tissue_mask, get_tissue_mask
+from ._tissue import clean_tissue_mask, downscale_for_thumbnail, get_tissue_mask
