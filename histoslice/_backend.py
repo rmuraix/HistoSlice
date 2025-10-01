@@ -476,7 +476,7 @@ class PyVipsBackend(SlideReaderBackend):
         # Handle zero-sized regions: pyvips extract_area doesn't support zero width/height
         if allowed_w == 0 or allowed_h == 0:
             # Return an empty array with the requested shape
-            tile = np.zeros((int(h_l), int(w_l), 3), dtype=np.uint8)
+            tile = np.zeros((int(h_l), int(w_l), 3), dtype=np.uint8) + 255
             return tile
 
         page = self._page(level)
