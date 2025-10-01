@@ -178,3 +178,4 @@ pyrightconfig.json
 tests/data/slide.czi
 tests/data/slide.svs
 tests/data/tmp
+tests/tmp

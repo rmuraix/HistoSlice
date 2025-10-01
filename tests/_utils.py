@@ -8,6 +8,7 @@ from histoslice import SlideReader
 DATA_DIRECTORY = Path(__file__).parent / "data"
 TMP_DIRECTORY = DATA_DIRECTORY.parent / "tmp"
 SLIDE_PATH_JPEG = DATA_DIRECTORY / "slide.jpeg"
+SLIDE_PATH_TIFF = DATA_DIRECTORY / "slide.tiff"
 SLIDE_PATH_SVS = DATA_DIRECTORY / "slide.svs"
 SLIDE_PATH_CZI = DATA_DIRECTORY / "slide.czi"
 SLIDE_PATH_TMA = DATA_DIRECTORY / "tma_spots.jpeg"
@@ -23,6 +24,8 @@ def clean_temporary_directory() -> None:
 # Optional dependency flags and asset availability
 HAS_CZI = importlib.util.find_spec("aicspylibczi") is not None
 HAS_OPENSLIDE = importlib.util.find_spec("openslide") is not None
+HAS_PYVIPS = importlib.util.find_spec("pyvips") is not None
 
 HAS_CZI_ASSET = HAS_CZI and SLIDE_PATH_CZI.exists()
-HAS_OPENSLIDE_ASSET = HAS_OPENSLIDE and SLIDE_PATH_SVS.exists()
+HAS_OPENSLIDE_ASSET = HAS_OPENSLIDE and SLIDE_PATH_TIFF.exists()
+HAS_PYVIPS_ASSET = HAS_PYVIPS and SLIDE_PATH_TIFF.exists()
