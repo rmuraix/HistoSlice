@@ -61,7 +61,7 @@ dev = [
     "pytest==8.4.2",
     "pytest-console-scripts==1.4.1",
     "pytest-cov==7.0.0",
-    "ruff==0.13.2",
+    "ruff==0.13.3",
 ]
 
 [tool.pytest.ini_options]
