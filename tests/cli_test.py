@@ -1,6 +1,3 @@
-from pathlib import Path
-import pytest
-
 from ._utils import (
     SLIDE_PATH_JPEG,
     TMP_DIRECTORY,

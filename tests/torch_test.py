@@ -197,8 +197,6 @@ def test_tile_dataset_cache_without_shape() -> None:
 
 def test_slide_reader_dataset_no_pytorch() -> None:
     """Test SlideReaderDataset raises ImportError when PyTorch is not available."""
-    # Create a mock environment without PyTorch
-    import sys
     import histoslice.utils._torch
 
     # Save the original value
