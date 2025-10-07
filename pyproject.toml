@@ -62,6 +62,7 @@ dev = [
     "pytest-console-scripts==1.4.1",
     "pytest-cov==7.0.0",
     "ruff==0.13.3",
+    "torch>=2.0.0",
 ]
 
 [tool.pytest.ini_options]
