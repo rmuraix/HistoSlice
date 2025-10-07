@@ -145,3 +145,93 @@ def test_tile_dataset_cache() -> None:
     assert batch_coords.shape == (32, 4)
     assert dataset._cached_indices == set(range(32))
     assert np.equal(dataset._cache_array[0][..., 0], batch_images[0].numpy()).all()
+
+
+def test_tile_dataset_no_labels() -> None:
+    """Test TileImageDataset without labels."""
+    if not HAS_TORCH:
+        return pytest.skip("PyTorch is not installed")
+    clean_temporary_directory()
+    reader = SlideReader(SLIDE_PATH_JPEG)
+    metadata = reader.save_regions(TMP_DIRECTORY, reader.get_tile_coordinates(None, 96))
+    dataset = TileImageDataset(
+        metadata["path"].to_numpy(),
+        labels=None,
+    )
+    batch_images, batch_paths = next(iter(DataLoader(dataset, batch_size=4)))
+    clean_temporary_directory()
+    assert batch_images.shape == (4, 96, 96, 3)
+    assert len(batch_paths) == 4
+
+
+def test_tile_dataset_label_length_mismatch() -> None:
+    """Test TileImageDataset raises error when labels length doesn't match paths."""
+    if not HAS_TORCH:
+        return pytest.skip("PyTorch is not installed")
+    clean_temporary_directory()
+    reader = SlideReader(SLIDE_PATH_JPEG)
+    metadata = reader.save_regions(TMP_DIRECTORY, reader.get_tile_coordinates(None, 96))
+    paths = metadata["path"].to_numpy()
+
+    with pytest.raises(ValueError, match="Path length .* does not match label length"):
+        TileImageDataset(paths=paths, labels=["label1", "label2"])
+    clean_temporary_directory()
+
+
+def test_tile_dataset_cache_without_shape() -> None:
+    """Test TileImageDataset raises error when use_cache=True but tile_shape=None."""
+    if not HAS_TORCH:
+        return pytest.skip("PyTorch is not installed")
+    clean_temporary_directory()
+    reader = SlideReader(SLIDE_PATH_JPEG)
+    metadata = reader.save_regions(TMP_DIRECTORY, reader.get_tile_coordinates(None, 96))
+
+    with pytest.raises(ValueError, match="Tile shape must be defined"):
+        TileImageDataset(
+            paths=metadata["path"].to_numpy(),
+            use_cache=True,
+            tile_shape=None,
+        )
+    clean_temporary_directory()
+
+
+def test_slide_reader_dataset_no_pytorch() -> None:
+    """Test SlideReaderDataset raises ImportError when PyTorch is not available."""
+    # Create a mock environment without PyTorch
+    import sys
+    import histoslice.utils._torch
+
+    # Save the original value
+    original_has_pytorch = histoslice.utils._torch.HAS_PYTORCH
+
+    # Temporarily set HAS_PYTORCH to False
+    histoslice.utils._torch.HAS_PYTORCH = False
+
+    try:
+        reader = SlideReader(SLIDE_PATH_JPEG)
+        __, tissue_mask = reader.get_tissue_mask()
+        coords = reader.get_tile_coordinates(tissue_mask, 512, max_background=0.01)
+
+        with pytest.raises(ImportError, match="Could not import torch"):
+            SlideReaderDataset(reader, coords, level=1)
+    finally:
+        # Restore the original value
+        histoslice.utils._torch.HAS_PYTORCH = original_has_pytorch
+
+
+def test_tile_image_dataset_no_pytorch() -> None:
+    """Test TileImageDataset raises ImportError when PyTorch is not available."""
+    import histoslice.utils._torch
+
+    # Save the original value
+    original_has_pytorch = histoslice.utils._torch.HAS_PYTORCH
+
+    # Temporarily set HAS_PYTORCH to False
+    histoslice.utils._torch.HAS_PYTORCH = False
+
+    try:
+        with pytest.raises(ImportError, match="Could not import torch"):
+            TileImageDataset(paths=["path1.jpg", "path2.jpg"])
+    finally:
+        # Restore the original value
+        histoslice.utils._torch.HAS_PYTORCH = original_has_pytorch

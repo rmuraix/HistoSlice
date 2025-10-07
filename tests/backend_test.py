@@ -50,6 +50,23 @@ def read_invalid_level(
         backend.read_region((0, 0, 10, 10), level=100)
 
 
+def test_pillow_backend_properties() -> None:
+    """Test PillowBackend properties."""
+    backend = PillowBackend(SLIDE_PATH_JPEG)
+    assert backend.path == str(SLIDE_PATH_JPEG.resolve())
+    assert backend.name == "slide"
+    assert backend.suffix == ".jpeg"
+    assert backend.reader is not None
+
+
+def test_pillow_backend_invalid_path() -> None:
+    """Test PillowBackend with invalid path."""
+    from pathlib import Path
+
+    with pytest.raises(FileNotFoundError):
+        PillowBackend(Path("/nonexistent/path.jpeg"))
+
+
 def test_pillow_init() -> None:
     __ = PillowBackend(SLIDE_PATH_JPEG)
     if not HAS_CZI_ASSET:
