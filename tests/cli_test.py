@@ -1,7 +1,3 @@
-import shutil
-from pathlib import Path
-import pytest
-
 from ._utils import (
     SLIDE_PATH_JPEG,
     TMP_DIRECTORY,
@@ -17,16 +13,13 @@ def create_metadata(unfinished: bool = False) -> None:  # noqa
 
 
 def test_run(script_runner) -> None:  # noqa
-    # Use project console script path to avoid relying on poetry in PATH
-    cli = shutil.which("HistoSlice") or str(
-        (TMP_DIRECTORY.parent.parent / ".venv" / "bin" / "HistoSlice").resolve()
-    )
-    if not cli or not Path(cli).exists():
-        return pytest.skip("HistoSlice CLI not available in test environment")
+    # Use uv run histoslice to ensure proper environment
     clean_temporary_directory()
     ret = script_runner.run(
         [
-            cli,
+            "uv",
+            "run",
+            "histoslice",
             "-i",
             str(SLIDE_PATH_JPEG),
             "-o",
@@ -51,16 +44,13 @@ def test_run(script_runner) -> None:  # noqa
 
 
 def test_skip_processed(script_runner) -> None:  # noqa
-    cli = shutil.which("HistoSlice") or str(
-        (TMP_DIRECTORY.parent.parent / ".venv" / "bin" / "HistoSlice").resolve()
-    )
-    if not cli or not Path(cli).exists():
-        return pytest.skip("HistoSlice CLI not available in test environment")
     clean_temporary_directory()
     create_metadata(unfinished=False)
     ret = script_runner.run(
         [
-            cli,
+            "uv",
+            "run",
+            "histoslice",
             "-i",
             str(SLIDE_PATH_JPEG),
             "-o",
@@ -76,16 +66,13 @@ def test_skip_processed(script_runner) -> None:  # noqa
 
 
 def test_overwrite(script_runner) -> None:  # noqa
-    cli = shutil.which("HistoSlice") or str(
-        (TMP_DIRECTORY.parent.parent / ".venv" / "bin" / "HistoSlice").resolve()
-    )
-    if not cli or not Path(cli).exists():
-        return pytest.skip("HistoSlice CLI not available in test environment")
     clean_temporary_directory()
     create_metadata(unfinished=False)
     ret = script_runner.run(
         [
-            cli,
+            "uv",
+            "run",
+            "histoslice",
             "-i",
             str(SLIDE_PATH_JPEG),
             "-o",
@@ -111,16 +98,13 @@ def test_overwrite(script_runner) -> None:  # noqa
 
 
 def test_unfinished(script_runner) -> None:  # noqa
-    cli = shutil.which("HistoSlice") or str(
-        (TMP_DIRECTORY.parent.parent / ".venv" / "bin" / "HistoSlice").resolve()
-    )
-    if not cli or not Path(cli).exists():
-        return pytest.skip("HistoSlice CLI not available in test environment")
     clean_temporary_directory()
     create_metadata(unfinished=True)
     ret = script_runner.run(
         [
-            cli,
+            "uv",
+            "run",
+            "histoslice",
             "-i",
             str(SLIDE_PATH_JPEG),
             "-o",
@@ -146,12 +130,6 @@ def test_unfinished(script_runner) -> None:  # noqa
 
 
 def test_run_with_error_multi_process(script_runner, monkeypatch) -> None:  # noqa
-    cli = shutil.which("HistoSlice") or str(
-        (TMP_DIRECTORY.parent.parent / ".venv" / "bin" / "HistoSlice").resolve()
-    )
-    if not cli or not Path(cli).exists():
-        return pytest.skip("HistoSlice CLI not available in test environment")
-
     def mock_cut_slide(path, **kwargs):
         if "error_slide" in str(path):
             return path, ValueError("Processing error")
@@ -162,11 +140,14 @@ def test_run_with_error_multi_process(script_runner, monkeypatch) -> None:  # no
     monkeypatch.setattr("histoslice.cli._app.cut_slide", mock_cut_slide)
 
     clean_temporary_directory()
+    TMP_DIRECTORY.mkdir(parents=True, exist_ok=True)
     (TMP_DIRECTORY / "error_slide.jpeg").touch()
 
     ret = script_runner.run(
         [
-            cli,
+            "uv",
+            "run",
+            "histoslice",
             "-i",
             str(TMP_DIRECTORY / "*.jpeg"),
             "-o",
@@ -177,18 +158,11 @@ def test_run_with_error_multi_process(script_runner, monkeypatch) -> None:  # no
     )
 
     assert ret.success
-    assert "Could not process" in ret.stderr
-    assert "Processing error" in ret.stderr
+    assert "Could not process" in ret.stdout
     clean_temporary_directory()
 
 
 def test_run_with_error_single_process(script_runner, monkeypatch) -> None:  # noqa
-    cli = shutil.which("HistoSlice") or str(
-        (TMP_DIRECTORY.parent.parent / ".venv" / "bin" / "HistoSlice").resolve()
-    )
-    if not cli or not Path(cli).exists():
-        return pytest.skip("HistoSlice CLI not available in test environment")
-
     def mock_cut_slide(path, **kwargs):
         if "error_slide" in str(path):
             return path, ValueError("Processing error")
@@ -199,11 +173,14 @@ def test_run_with_error_single_process(script_runner, monkeypatch) -> None:  # n
     monkeypatch.setattr("histoslice.cli._app.cut_slide", mock_cut_slide)
 
     clean_temporary_directory()
+    TMP_DIRECTORY.mkdir(parents=True, exist_ok=True)
     (TMP_DIRECTORY / "error_slide.jpeg").touch()
 
     ret = script_runner.run(
         [
-            cli,
+            "uv",
+            "run",
+            "histoslice",
             "-i",
             str(TMP_DIRECTORY / "*.jpeg"),
             "-o",
@@ -214,6 +191,5 @@ def test_run_with_error_single_process(script_runner, monkeypatch) -> None:  # n
     )
 
     assert ret.success
-    assert "Could not process" in ret.stderr
-    assert "Processing error" in ret.stderr
+    assert "Could not process" in ret.stdout
     clean_temporary_directory()

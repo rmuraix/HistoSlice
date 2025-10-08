@@ -217,3 +217,69 @@ def test_cut_slide_auto_level(mock_slide_reader):
     reader_instance.level_from_max_dimension.assert_called_once_with(512)
     # The modified tissue_kwargs is passed to get_tissue_mask
     assert reader_instance.get_tissue_mask.call_args[1]["level"] == 5
+
+
+def test_warning_function(monkeypatch):
+    """Test the warning() function."""
+    from histoslice.cli._app import warning
+
+    mock_secho = MagicMock()
+    monkeypatch.setattr("typer.secho", mock_secho)
+
+    warning("Test warning message")
+
+    mock_secho.assert_called_once()
+    call_args = mock_secho.call_args
+    assert call_args[0][0] == "Test warning message"
+    assert call_args[1]["fg"] == "yellow"
+    assert call_args[1]["bold"] is True
+
+
+def test_info_function(monkeypatch):
+    """Test the info() function."""
+    from histoslice.cli._app import info
+
+    mock_secho = MagicMock()
+    monkeypatch.setattr("typer.secho", mock_secho)
+
+    info("Test info message")
+
+    mock_secho.assert_called_once()
+    call_args = mock_secho.call_args
+    assert call_args[0][0] == "Test info message"
+    assert call_args[1]["fg"] == "cyan"
+    assert call_args[1]["bold"] is True
+
+
+def test_error_function(monkeypatch):
+    """Test the error() function."""
+    from histoslice.cli._app import error
+
+    mock_secho = MagicMock()
+    mock_exit = MagicMock()
+    monkeypatch.setattr("typer.secho", mock_secho)
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    error("Test error message")
+
+    mock_secho.assert_called_once()
+    call_args = mock_secho.call_args
+    assert call_args[0][0] == "Test error message"
+    assert call_args[1]["fg"] == "red"
+    assert call_args[1]["bold"] is True
+    assert call_args[1]["err"] is True
+    mock_exit.assert_called_once_with(1)
+
+
+def test_error_function_custom_code(monkeypatch):
+    """Test the error() function with custom exit code."""
+    from histoslice.cli._app import error
+
+    mock_secho = MagicMock()
+    mock_exit = MagicMock()
+    monkeypatch.setattr("typer.secho", mock_secho)
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    error("Test error message", exit_integer=42)
+
+    mock_exit.assert_called_once_with(42)
