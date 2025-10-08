@@ -19,13 +19,12 @@ from histoslice.utils import (
 )
 
 from ._utils import (
-    SLIDE_PATH_CZI,
-    SLIDE_PATH_JPEG,
-    SLIDE_PATH_SVS,
-    TMP_DIRECTORY,
-    clean_temporary_directory,
     HAS_CZI_ASSET,
     HAS_OPENSLIDE_ASSET,
+    SLIDE_PATH_CZI,
+    SLIDE_PATH_JPEG,
+    TMP_DIRECTORY,
+    clean_temporary_directory,
 )
 
 
@@ -66,7 +65,7 @@ def test_reader_dataset_loader_openslide() -> None:
         return pytest.skip("PyTorch is not installed")
     if not HAS_OPENSLIDE_ASSET:
         return pytest.skip("OpenSlide test data or dependency missing")
-    reader = SlideReader(SLIDE_PATH_SVS)
+    reader = SlideReader(SLIDE_PATH_JPEG)
     __, tissue_mask = reader.get_tissue_mask()
     coords = reader.get_tile_coordinates(tissue_mask, 512, max_background=0.01)
     dataset = SlideReaderDataset(reader, coords, level=1, transform=lambda z: z)
