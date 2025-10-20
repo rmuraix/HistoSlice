@@ -35,10 +35,13 @@ def test_metadata_properties() -> None:
     assert len(metadata.outlier_selections) == 0
     assert len(metadata.metric_columns) == 64
     assert metadata.metrics.shape == (100, 64)
-    assert metadata.mean_and_std == (
-        (0.8448732156862745, 0.7013530588235295, 0.7794474117647058),
-        (0.13158384313725494, 0.1708792549019608, 0.13072776470588235),
-    )
+    # Use approximate equality for floating point values
+    mean, std = metadata.mean_and_std
+    expected_mean = (0.8448732156862745, 0.7013530588235295, 0.7794474117647058)
+    expected_std = (0.13158384313725494, 0.1708792549019608, 0.13072776470588235)
+    for i in range(3):
+        assert abs(mean[i] - expected_mean[i]) < 1e-10
+        assert abs(std[i] - expected_std[i]) < 1e-10
     assert str(metadata) == "OutlierDetector(num_images=100, num_outliers=0)"
 
 

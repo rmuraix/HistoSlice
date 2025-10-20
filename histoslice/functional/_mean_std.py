@@ -52,7 +52,7 @@ def _get_mean_and_std(image: np.ndarray) -> tuple[MEAN, STD]:
     """Calculate mean and standard deviation for each image channel (between [0, 1])."""
     check_image(image)
     if image.ndim == 2:  # noqa
-        image = np.expand_dims(tile, -1)  # noqa
+        image = np.expand_dims(image, -1)  # noqa
     return (
         tuple([image[..., i].mean() / 255 for i in range(image.shape[-1])]),
         tuple([image[..., i].std() / 255 for i in range(image.shape[-1])]),

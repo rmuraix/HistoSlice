@@ -109,8 +109,14 @@ class OutlierDetector:
         self,
     ) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
         """Means and standard deviations for RGB channels."""
-        mean = tuple((self.dataframe[RGB_MEAN_COLUMNS].mean() / 255).to_numpy()[0])
-        std = tuple((self.dataframe[RGB_STD_COLUMNS].mean() / 255).to_numpy()[0])
+        mean = tuple(
+            float(x)
+            for x in (self.dataframe[RGB_MEAN_COLUMNS].mean() / 255).to_numpy()[0]
+        )
+        std = tuple(
+            float(x)
+            for x in (self.dataframe[RGB_STD_COLUMNS].mean() / 255).to_numpy()[0]
+        )
         return mean, std
 
     def add_outliers(self, selection: np.ndarray, *, desc: str) -> None:
