@@ -265,22 +265,30 @@ class PyVipsBackend(SlideReaderBackend):
             raise ImportError(ERROR_PYVIPS_IMPORT) from PYVIPS_ERROR
 
         super().__init__(path)
-        # Open the level-0 page lazily. pyvips is demand-driven, so this does
-        # not decode full pixels until needed.
-        self.__img0 = pyvips.Image.new_from_file(path, access="random", page=0)
         self.__path = path
 
-        # libvips exposes the pyramid levels as pages.
+        # Try loading with page parameter first (for pyramidal images like TIFF)
         try:
-            n_pages = int(self.__img0.get("n-pages"))
-        except Exception:
-            # Fallback: if metadata missing, assume single page.
+            self.__img0 = pyvips.Image.new_from_file(path, access="random", page=0)
+            # libvips exposes the pyramid levels as pages.
+            try:
+                n_pages = int(self.__img0.get("n-pages"))
+            except Exception:
+                # Fallback: if metadata missing, assume single page.
+                n_pages = 1
+        except pyvips.error.Error:
+            # For non-pyramidal images (like JPEG), load without page parameter
+            self.__img0 = pyvips.Image.new_from_file(path, access="random")
             n_pages = 1
 
         # Build (height, width) per level. pyvips uses width/height props.
         level_dims: Dict[int, Tuple[int, int]] = {}
         for lvl in range(n_pages):
-            page = pyvips.Image.new_from_file(path, access="random", page=lvl)
+            try:
+                page = pyvips.Image.new_from_file(path, access="random", page=lvl)
+            except pyvips.error.Error:
+                # For non-pyramidal images, just use the main image
+                page = pyvips.Image.new_from_file(path, access="random")
             # Ensure dimensions are (H, W) to match user's class contract.
             level_dims[lvl] = (int(page.height), int(page.width))
         self.__level_dimensions = level_dims
@@ -338,7 +346,11 @@ class PyVipsBackend(SlideReaderBackend):
     # -------------------- reading APIs --------------------
     def _page(self, level: int) -> "pyvips.Image":
         # Helper: fetch a given level/page lazily.
-        return pyvips.Image.new_from_file(self.__path, access="random", page=level)
+        try:
+            return pyvips.Image.new_from_file(self.__path, access="random", page=level)
+        except pyvips.error.Error:
+            # For non-pyramidal images, just return the main image
+            return pyvips.Image.new_from_file(self.__path, access="random")
 
     def read_level(self, level: int) -> np.ndarray:
         level = format_level(level, available=list(self.level_dimensions))
