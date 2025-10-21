@@ -329,3 +329,51 @@ class CutSlideKwargs(TypedDict):
     tissue_kwargs: TissueKwargs
     tile_kwargs: TileKwargs
     save_kwargs: SaveKwargs
+
+
+# ---- Clean options ----
+def clean_opts(
+    input_pattern: Annotated[
+        str,
+        typer.Option(
+            "--input",
+            "-i",
+            help="File pattern to glob for metadata files (parquet or csv).",
+            rich_help_panel="Input",
+        ),
+    ],
+    mode: Annotated[
+        str,
+        typer.Option(
+            "--mode",
+            "-m",
+            help="Outlier detection mode.",
+            rich_help_panel="Outlier detection",
+        ),
+    ] = "clustering",
+    num_clusters: Annotated[
+        int,
+        typer.Option(
+            "--num-clusters",
+            "-k",
+            min=2,
+            help="Number of clusters for k-means clustering.",
+            rich_help_panel="Outlier detection",
+        ),
+    ] = 4,
+    delete: Annotated[
+        bool,
+        typer.Option(
+            "--delete",
+            "-d",
+            help="Delete detected outlier images. If not specified, moves to 'outliers' subdirectory.",
+            rich_help_panel="Output",
+        ),
+    ] = False,
+) -> Dict:
+    return {
+        "input_pattern": input_pattern,
+        "mode": mode,
+        "num_clusters": num_clusters,
+        "delete": delete,
+    }

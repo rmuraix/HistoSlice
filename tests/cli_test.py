@@ -20,6 +20,7 @@ def test_run(script_runner) -> None:  # noqa
             "uv",
             "run",
             "histoslice",
+            "slice",
             "-i",
             str(SLIDE_PATH_JPEG),
             "-o",
@@ -51,6 +52,7 @@ def test_skip_processed(script_runner) -> None:  # noqa
             "uv",
             "run",
             "histoslice",
+            "slice",
             "-i",
             str(SLIDE_PATH_JPEG),
             "-o",
@@ -73,6 +75,7 @@ def test_overwrite(script_runner) -> None:  # noqa
             "uv",
             "run",
             "histoslice",
+            "slice",
             "-i",
             str(SLIDE_PATH_JPEG),
             "-o",
@@ -105,6 +108,7 @@ def test_unfinished(script_runner) -> None:  # noqa
             "uv",
             "run",
             "histoslice",
+            "slice",
             "-i",
             str(SLIDE_PATH_JPEG),
             "-o",
@@ -148,6 +152,7 @@ def test_run_with_error_multi_process(script_runner, monkeypatch) -> None:  # no
             "uv",
             "run",
             "histoslice",
+            "slice",
             "-i",
             str(TMP_DIRECTORY / "*.jpeg"),
             "-o",
@@ -181,6 +186,7 @@ def test_run_with_error_single_process(script_runner, monkeypatch) -> None:  # n
             "uv",
             "run",
             "histoslice",
+            "slice",
             "-i",
             str(TMP_DIRECTORY / "*.jpeg"),
             "-o",
@@ -192,4 +198,119 @@ def test_run_with_error_single_process(script_runner, monkeypatch) -> None:  # n
 
     assert ret.success
     assert "Could not process" in ret.stdout
+    clean_temporary_directory()
+
+
+def test_clean_command_move(script_runner) -> None:  # noqa
+    """Test clean command with move (default) behavior."""
+    from histoslice import SlideReader
+
+    clean_temporary_directory()
+    # First, create tiles with metrics
+    reader = SlideReader(SLIDE_PATH_JPEG)
+    reader.save_regions(
+        TMP_DIRECTORY,
+        reader.get_tile_coordinates(None, 256, overlap=0.0),
+        save_metrics=True,
+        threshold=200,
+    )
+
+    # Count initial tiles
+    tiles_dir = TMP_DIRECTORY / "slide" / "tiles"
+    initial_tile_count = len(list(tiles_dir.glob("*.jpeg")))
+    assert initial_tile_count > 0
+
+    # Run clean command (move mode)
+    ret = script_runner.run(
+        [
+            "uv",
+            "run",
+            "histoslice",
+            "clean",
+            "-i",
+            str(TMP_DIRECTORY / "slide" / "metadata.parquet"),
+            "-k",
+            "4",
+        ]
+    )
+
+    assert ret.success
+
+    # Check that outliers directory was created
+    outliers_dir = TMP_DIRECTORY / "slide" / "outliers"
+    assert outliers_dir.exists()
+
+    # Check that some files were moved
+    moved_count = len(list(outliers_dir.glob("*.jpeg")))
+    remaining_count = len(list(tiles_dir.glob("*.jpeg")))
+    assert moved_count > 0
+    assert remaining_count + moved_count == initial_tile_count
+
+    clean_temporary_directory()
+
+
+def test_clean_command_delete(script_runner) -> None:  # noqa
+    """Test clean command with delete behavior."""
+    from histoslice import SlideReader
+
+    clean_temporary_directory()
+    # First, create tiles with metrics
+    reader = SlideReader(SLIDE_PATH_JPEG)
+    reader.save_regions(
+        TMP_DIRECTORY,
+        reader.get_tile_coordinates(None, 256, overlap=0.0),
+        save_metrics=True,
+        threshold=200,
+    )
+
+    # Count initial tiles
+    tiles_dir = TMP_DIRECTORY / "slide" / "tiles"
+    initial_tile_count = len(list(tiles_dir.glob("*.jpeg")))
+    assert initial_tile_count > 0
+
+    # Run clean command (delete mode)
+    ret = script_runner.run(
+        [
+            "uv",
+            "run",
+            "histoslice",
+            "clean",
+            "-i",
+            str(TMP_DIRECTORY / "slide" / "metadata.parquet"),
+            "-k",
+            "4",
+            "--delete",
+        ]
+    )
+
+    assert ret.success
+
+    # Check that some files were deleted
+    remaining_count = len(list(tiles_dir.glob("*.jpeg")))
+    assert remaining_count < initial_tile_count
+
+    # Check that outliers directory was NOT created
+    outliers_dir = TMP_DIRECTORY / "slide" / "outliers"
+    assert not outliers_dir.exists()
+
+    clean_temporary_directory()
+
+
+def test_clean_command_no_metadata(script_runner) -> None:  # noqa
+    """Test clean command with non-existent metadata file."""
+    clean_temporary_directory()
+
+    ret = script_runner.run(
+        [
+            "uv",
+            "run",
+            "histoslice",
+            "clean",
+            "-i",
+            str(TMP_DIRECTORY / "nonexistent" / "metadata.parquet"),
+        ]
+    )
+
+    # Should fail because no metadata files found
+    assert not ret.success
     clean_temporary_directory()

@@ -19,13 +19,16 @@ from histoslice.cli._options import (
     SaveKwargs,
     TileKwargs,
     TissueKwargs,
+    clean_opts,
     io_opts,
     save_opts,
     tile_opts,
     tissue_opts,
 )
 
-app = TyperDI(name="histoslice", help="Cut histological slides into small tile images.")
+app = TyperDI(
+    name="histoslice", help="Tools for preprocessing histological slide images."
+)
 
 
 @app.command("slice")
@@ -97,6 +100,100 @@ def cut_slides(
             ):
                 if isinstance(exception, Exception):
                     warning(f"Could not process {path} due to exception: {exception!r}")
+
+
+@app.command("clean")
+def clean_tiles(
+    clean: Annotated[Dict, Depends(clean_opts)],
+) -> None:
+    """Detect and remove outlier tile images using clustering."""
+    import glob
+    import shutil
+    from pathlib import Path
+
+    from histoslice.utils import OutlierDetector
+
+    # Validate mode
+    if clean["mode"] != "clustering":
+        error(
+            f"Unknown mode '{clean['mode']}'. Currently only 'clustering' is supported."
+        )
+
+    # Find metadata files
+    metadata_paths = glob.glob(clean["input_pattern"], recursive=True)
+    if not metadata_paths:
+        error(f"Found no metadata files matching pattern '{clean['input_pattern']}'.")
+
+    info(f"Found {len(metadata_paths)} metadata file(s) to process.")
+
+    total_outliers = 0
+    total_deleted = 0
+    total_moved = 0
+
+    for metadata_path in metadata_paths:
+        metadata_path = Path(metadata_path)
+
+        try:
+            # Load metadata
+            if metadata_path.suffix == ".parquet":
+                detector = OutlierDetector.from_parquet(metadata_path)
+            elif metadata_path.suffix == ".csv":
+                detector = OutlierDetector.from_csv(metadata_path)
+            else:
+                warning(f"Skipping unsupported file format: {metadata_path}")
+                continue
+
+            info(f"Processing {metadata_path.name} with {len(detector)} tiles...")
+
+            # Perform clustering
+            clusters = detector.cluster_kmeans(num_clusters=clean["num_clusters"])
+
+            # Assume cluster 0 contains outliers (smallest cluster by distance)
+            outlier_mask = clusters == 0
+            num_outliers = outlier_mask.sum()
+
+            if num_outliers == 0:
+                info(f"No outliers detected in {metadata_path.name}")
+                continue
+
+            info(f"Detected {num_outliers} outlier tiles in cluster 0")
+            total_outliers += num_outliers
+
+            # Get paths of outlier tiles
+            outlier_paths = detector.paths[outlier_mask]
+
+            # Process each outlier tile
+            for tile_path in outlier_paths:
+                tile_path = Path(tile_path)
+                if not tile_path.exists():
+                    warning(f"Tile file not found: {tile_path}")
+                    continue
+
+                if clean["delete"]:
+                    # Delete the file
+                    tile_path.unlink()
+                    total_deleted += 1
+                else:
+                    # Move to outliers subdirectory
+                    outliers_dir = tile_path.parent.parent / "outliers"
+                    outliers_dir.mkdir(exist_ok=True)
+                    destination = outliers_dir / tile_path.name
+                    shutil.move(str(tile_path), str(destination))
+                    total_moved += 1
+
+        except Exception as e:
+            warning(f"Could not process {metadata_path} due to exception: {e!r}")
+            continue
+
+    # Summary
+    if clean["delete"]:
+        info(
+            f"Detected {total_outliers} outliers across all slides, deleted {total_deleted} files."
+        )
+    else:
+        info(
+            f"Detected {total_outliers} outliers across all slides, moved {total_moved} files to 'outliers' subdirectories."
+        )
 
 
 def filter_slide_paths(  # noqa
