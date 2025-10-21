@@ -3,20 +3,18 @@ import warnings
 import numpy as np
 import polars as pl
 import pytest
-from PIL import Image, UnidentifiedImageError
+from PIL import Image
 
 import histoslice.functional as F
 from histoslice import SlideReader
-from histoslice._backend import CziBackend, OpenSlideBackend, PillowBackend
+from histoslice._backend import CziBackend, PyVipsBackend
 from histoslice._data import SpotCoordinates, TileCoordinates
 
 from ._utils import (
     DATA_DIRECTORY,
     HAS_CZI_ASSET,
-    HAS_OPENSLIDE_ASSET,
     SLIDE_PATH_CZI,
     SLIDE_PATH_JPEG,
-    SLIDE_PATH_TIFF,
     SLIDE_PATH_TMA,
     TMP_DIRECTORY,
     clean_temporary_directory,
@@ -38,14 +36,11 @@ def test_reader_init_no_file() -> None:
         __ = SlideReader("i/dont/exist.czi")
 
 
-def test_reader_init_pillow() -> None:
+def test_reader_init_pyvips() -> None:
     __ = SlideReader(SLIDE_PATH_JPEG)
-    __ = SlideReader(SLIDE_PATH_JPEG, backend=PillowBackend)
-    __ = SlideReader(SLIDE_PATH_JPEG, backend="PIL")
-    __ = SlideReader(SLIDE_PATH_JPEG, backend="PILlow")
-    if HAS_CZI_ASSET:
-        with pytest.raises(UnidentifiedImageError):
-            __ = SlideReader(SLIDE_PATH_CZI, backend="PILlow")
+    __ = SlideReader(SLIDE_PATH_JPEG, backend=PyVipsBackend)
+    __ = SlideReader(SLIDE_PATH_JPEG, backend="PYVIPS")
+    __ = SlideReader(SLIDE_PATH_JPEG, backend="pyvips")
 
 
 def test_reader_init_czi() -> None:
@@ -59,19 +54,6 @@ def test_reader_init_czi() -> None:
         __ = SlideReader(SLIDE_PATH_TMA, backend="czi")
 
 
-def test_reader_init_openslide() -> None:
-    if not HAS_OPENSLIDE_ASSET:
-        pytest.skip("OpenSlide test data or dependency missing")
-    __ = SlideReader(SLIDE_PATH_TIFF)
-    __ = SlideReader(SLIDE_PATH_TIFF, backend=OpenSlideBackend)
-    __ = SlideReader(SLIDE_PATH_TIFF, backend="open")
-    __ = SlideReader(SLIDE_PATH_TIFF, backend="openSLIDe")
-    from openslide import OpenSlideUnsupportedFormatError
-
-    with pytest.raises(OpenSlideUnsupportedFormatError):
-        __ = SlideReader(SLIDE_PATH_JPEG, backend="openslide")
-
-
 def test_reader_properties_backend() -> None:
     reader = SlideReader(SLIDE_PATH_JPEG)
     assert reader.path == reader._backend.path
@@ -81,7 +63,7 @@ def test_reader_properties_backend() -> None:
     assert reader.level_count == reader._backend.level_count
     assert reader.level_dimensions == reader._backend.level_dimensions
     assert reader.level_downsamples == reader._backend.level_downsamples
-    assert str(reader) == f"SlideReader(path={reader.path}, backend=PILLOW)"
+    assert str(reader) == f"SlideReader(path={reader.path}, backend=PYVIPS)"
 
 
 def test_reader_methods_backend() -> None:

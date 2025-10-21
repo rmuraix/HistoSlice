@@ -18,7 +18,7 @@ except Exception as e:  # pragma: no cover - import guard
     CziFile = None  # type: ignore
     HAS_CZI = False
     CZI_ERROR = e
-from PIL import Image
+
 
 from histoslice.functional._level import format_level
 from histoslice.functional._tiles import (
@@ -27,15 +27,6 @@ from histoslice.functional._tiles import (
     _pad_tile,
 )
 
-try:
-    import openslide
-
-    OPENSLIDE_ERROR = None
-    HAS_OPENSLIDE = True
-except ImportError as error:
-    openslide = None
-    OPENSLIDE_ERROR = error
-    HAS_OPENSLIDE = False
 
 try:
     import pyvips
@@ -53,11 +44,6 @@ ERROR_PYVIPS_IMPORT = (
 )
 
 
-Image.MAX_IMAGE_PIXELS = 20_000 * 20_000
-ERROR_OPENSLIDE_IMPORT = (
-    "Could not import `openslide-python`, make sure `OpenSlide` is installed "
-    "(https://openslide.org/api/python/)."
-)
 ERROR_CZI_IMPORT = (
     "Could not import `aicspylibczi`. Install with `pip install aicspylibczi` "
     "and ensure libCZI prerequisites are available."
@@ -254,84 +240,6 @@ class CziBackend(SlideReaderBackend):
         )
 
 
-class OpenSlideBackend(SlideReaderBackend):
-    """Slide reader using `OpenSlide` as a backend."""
-
-    BACKEND_NAME = "OPENSLIDE"
-
-    def __init__(self, path: str) -> None:
-        """Initialize OpenSlideBackend class instance.
-
-        Args:
-            path: Path to the slide image.
-
-        Raises:
-            ImportError: OpenSlide could not be imported.
-        """
-        if not HAS_OPENSLIDE:
-            raise ImportError(ERROR_OPENSLIDE_IMPORT) from OPENSLIDE_ERROR
-        super().__init__(path)
-        self.__reader = openslide.OpenSlide(path)
-        # Openslide has (width, height) dimensions.
-        self.__level_dimensions = {
-            lvl: (h, w) for lvl, (w, h) in enumerate(self.__reader.level_dimensions)
-        }
-        # Calculate actual downsamples.
-        slide_h, slide_w = self.dimensions
-        self.__level_downsamples = {}
-        for lvl, (level_h, level_w) in self.__level_dimensions.items():
-            self.__level_downsamples[lvl] = (slide_h / level_h, slide_w / level_w)
-
-    @property
-    def reader(self) -> "openslide.OpenSlide":
-        """OpenSlide instance."""
-        return self.__reader
-
-    @property
-    def data_bounds(self) -> tuple[int, int, int, int]:
-        properties = dict(self.__reader.properties)
-        x_bound = int(properties.get("openslide.bounds-x", 0))
-        y_bound = int(properties.get("openslide.bounds-y", 0))
-        w_bound = int(properties.get("openslide.bounds-width", self.dimensions[1]))
-        h_bound = int(properties.get("openslide.bounds-heigh", self.dimensions[0]))
-        return (x_bound, y_bound, w_bound, h_bound)
-
-    @property
-    def dimensions(self) -> tuple[int, int]:
-        return self.level_dimensions[0]
-
-    @property
-    def level_count(self) -> int:
-        return len(self.level_dimensions)
-
-    @property
-    def level_dimensions(self) -> dict[int, tuple[int, int]]:
-        return self.__level_dimensions
-
-    @property
-    def level_downsamples(self) -> dict[int, tuple[int, int]]:
-        return self.__level_downsamples
-
-    def read_level(self, level: int) -> np.ndarray:
-        level = format_level(level, available=list(self.level_dimensions))
-        level_h, level_w = self.level_dimensions[level]
-        return np.array(self.__reader.get_thumbnail(size=(level_w, level_h)))
-
-    def read_region(self, xywh: tuple[int, int, int, int], level: int) -> np.ndarray:
-        level = format_level(level, available=list(self.level_dimensions))
-        # Only width and height have to be adjusted for the level.
-        x, y, *__ = xywh
-        *__, w, h = _divide_xywh(xywh, self.level_downsamples[level])
-        # Read allowed region.
-        allowed_h, allowed_w = _get_allowed_dimensions((x, y, w, h), self.dimensions)
-        tile = self.__reader.read_region(
-            location=(x, y), level=level, size=(allowed_w, allowed_h)
-        )
-        tile = np.array(tile)[..., :3]  # only rgb channels
-        # Pad tile.
-        return _pad_tile(tile, shape=(h, w))
-
-
 class PyVipsBackend(SlideReaderBackend):
     """Slide reader using `pyvips` (libvips) as a backend.
 
@@ -495,89 +403,3 @@ class PyVipsBackend(SlideReaderBackend):
         # Pad to the requested (h_l, w_l) shape if we hit the edge.
         tile = _pad_tile(tile, shape=(int(h_l), int(w_l)))
         return tile
-
-
-class PillowBackend(SlideReaderBackend):
-    """Slide reader using `Pillow` as a backend.
-
-    NOTE: `Pillow` reads the the whole slide into memory and thus isn't suitable for
-    large images.
-    """
-
-    MIN_LEVEL_DIMENSION = 512
-    BACKEND_NAME = "PILLOW"
-
-    def __init__(self, path: str) -> None:
-        """Initialize PillowBackend class instance.
-
-        Args:
-            path: Path to the slide image.
-        """
-        super().__init__(path)
-        # Read full image.
-        self.__pyramid = {0: Image.open(path)}
-        # Generate downsamples.
-        slide_h, slide_w = self.dimensions
-        lvl = 0
-        self.__level_dimensions, self.__level_downsamples = {}, {}
-        while lvl == 0 or max(slide_w, slide_h) // 2**lvl >= self.MIN_LEVEL_DIMENSION:
-            level_h, level_w = (slide_h // 2**lvl, slide_w // 2**lvl)
-            self.__level_dimensions[lvl] = (slide_h // 2**lvl, slide_w // 2**lvl)
-            self.__level_downsamples[lvl] = (slide_h / level_h, slide_w / level_w)
-            lvl += 1
-
-    @property
-    def reader(self) -> None:
-        """PIL image at level=0."""
-        return self.__pyramid[0]
-
-    @property
-    def data_bounds(self) -> tuple[int, int, int, int]:
-        h, w = self.dimensions
-        return (0, 0, w, h)
-
-    @property
-    def dimensions(self) -> tuple[int, int]:
-        # PIL has (width, height) size.
-        return self.__pyramid[0].size[::-1]
-
-    @property
-    def level_count(self) -> int:
-        return len(self.level_dimensions)
-
-    @property
-    def level_dimensions(self) -> dict[int, tuple[int, int]]:
-        return self.__level_dimensions
-
-    @property
-    def level_downsamples(self) -> dict[int, tuple[float, float]]:
-        return self.__level_downsamples
-
-    def read_level(self, level: int) -> np.ndarray:
-        level = format_level(level, available=list(self.level_dimensions))
-        self.__lazy_load(level)
-        return np.array(self.__pyramid[level])
-
-    def read_region(self, xywh: tuple[int, int, int, int], level: int) -> np.ndarray:
-        level = format_level(level, available=list(self.level_dimensions))
-        self.__lazy_load(level)
-        # Read allowed region.
-        x, y, output_w, output_h = _divide_xywh(xywh, self.level_downsamples[level])
-        allowed_h, allowed_w = _get_allowed_dimensions(
-            xywh=(x, y, output_w, output_h), dimensions=self.level_dimensions[level]
-        )
-        tile = np.array(
-            self.__pyramid[level].crop((x, y, x + allowed_w, y + allowed_h))
-        )
-        # Pad tile.
-        return _pad_tile(tile, shape=(output_h, output_w))
-
-    def __lazy_load(self, level: int) -> None:
-        if level not in self.__pyramid:
-            height, width = self.level_dimensions[level]
-            self.__pyramid[level] = self.__pyramid[0].resize(
-                (width, height), resample=Image.Resampling.NEAREST
-            )
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(path={self.path})"
