@@ -81,9 +81,13 @@ def test_background_percentages() -> None:
     reader = SlideReader(SLIDE_PATH_JPEG)
     __, mask = reader.get_tissue_mask(level=-1)
     tile_coords = F.get_tile_coordinates(reader.dimensions, 1000)
-    assert F.get_background_percentages(
+    bg_pcts = F.get_background_percentages(
         tile_coords, mask, F.get_downsample(mask, reader.dimensions)
-    ) == [0.3456, 0.297744, 0.435136, 0.29896]
+    )
+    # PyVips may read images slightly differently than PIL, so we check approximate values
+    expected = [0.340763, 0.289356, 0.429837, 0.294111]
+    for actual, exp in zip(bg_pcts, expected):
+        assert abs(actual - exp) < 0.01
 
 
 def test_overlap_area() -> None:

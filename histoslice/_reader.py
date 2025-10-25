@@ -12,11 +12,10 @@ import polars as pl
 import tqdm
 from PIL import Image
 
+
 import histoslice.functional as F
 from histoslice._backend import (
     CziBackend,
-    OpenSlideBackend,
-    PillowBackend,
     PyVipsBackend,
 )
 from histoslice._data import SpotCoordinates, TileCoordinates
@@ -32,8 +31,8 @@ ERROR_AUTOMATIC_BACKEND = (
 ERROR_BACKEND_NAME = "Backend '{}' does not exist, choose from: {}."
 ERROR_OUTPUT_DIR_IS_FILE = "Output directory exists but it is a file."
 ERROR_CANNOT_OVERWRITE = "Output directory exists, but `overwrite=False`."
-AVAILABLE_BACKENDS = ("PILLOW", "OPENSLIDE", "CZI")
-OPENSLIDE_READABLE_FORMATS = (
+AVAILABLE_BACKENDS = ("PYVIPS", "CZI")
+PYVIPS_READABLE_FORMATS = (
     "svs",
     "vms",
     "vmu",
@@ -44,6 +43,9 @@ OPENSLIDE_READABLE_FORMATS = (
     "svslide",
     "tif",
     "bif",
+    "jpeg",
+    "jpg",
+    "png",
 )
 
 
@@ -621,7 +623,7 @@ class RegionData:
 
 def _read_slide(  # noqa
     path: Union[str, Path], backend: Optional[str] = None
-) -> Union[CziBackend, OpenSlideBackend, PillowBackend, PyVipsBackend]:
+) -> Union[CziBackend, PyVipsBackend]:
     """Read slide with the requested backend.
 
     Args:
@@ -642,33 +644,21 @@ def _read_slide(  # noqa
         raise FileNotFoundError(str(path.resolve()))
     if backend is None:
         # Based on file-extension.
-        if path.name.endswith(OPENSLIDE_READABLE_FORMATS):
-            try:
-                return OpenSlideBackend(path)
-            except Exception:  # noqa: E501
-                # Fallback to PyVips if OpenSlide fails.
-                return PyVipsBackend(path)
-        if path.name.endswith(("jpeg", "jpg")):
-            return PillowBackend(path)
+        if path.name.endswith(PYVIPS_READABLE_FORMATS):
+            return PyVipsBackend(path)
         if path.name.endswith("czi"):
             return CziBackend(path)
         raise ValueError(ERROR_AUTOMATIC_BACKEND.format(path, AVAILABLE_BACKENDS))
     if isinstance(backend, str):
         # Based on backend argument.
-        if "PIL" in backend.upper():
-            return PillowBackend(path)
         if "PYVIPS" in backend.upper():
             return PyVipsBackend(path)
-        if "OPEN" in backend.upper():
-            return OpenSlideBackend(path)
         if "CZI" in backend.upper() or "ZEISS" in backend.upper():
             return CziBackend(path)
     if isinstance(
         backend,
         (
             type(CziBackend),
-            type(OpenSlideBackend),
-            type(PillowBackend),
             type(PyVipsBackend),
         ),
     ):
