@@ -338,7 +338,7 @@ def clean_opts(
         typer.Option(
             "--input",
             "-i",
-            help="File pattern to glob for metadata files (parquet or csv).",
+            help="Directory pattern to glob for slide outputs (e.g., './tiles/*' or './tiles/slide_*').",
             rich_help_panel="Input",
         ),
     ],
@@ -370,10 +370,22 @@ def clean_opts(
             rich_help_panel="Output",
         ),
     ] = False,
+    num_workers: Annotated[
+        Optional[int],
+        typer.Option(
+            "--num-workers",
+            "-j",
+            min=0,
+            show_default="CPU-count",
+            help="Number of parallel workers for processing slides.",
+            rich_help_panel="Output",
+        ),
+    ] = None,
 ) -> Dict:
     return {
         "input_pattern": input_pattern,
         "mode": mode,
         "num_clusters": num_clusters,
         "delete": delete,
+        "num_workers": num_workers,
     }

@@ -220,7 +220,7 @@ def test_clean_command_move(script_runner) -> None:  # noqa
     initial_tile_count = len(list(tiles_dir.glob("*.jpeg")))
     assert initial_tile_count > 0
 
-    # Run clean command (move mode)
+    # Run clean command (move mode) with directory pattern
     ret = script_runner.run(
         [
             "uv",
@@ -228,9 +228,11 @@ def test_clean_command_move(script_runner) -> None:  # noqa
             "histoslice",
             "clean",
             "-i",
-            str(TMP_DIRECTORY / "slide" / "metadata.parquet"),
+            str(TMP_DIRECTORY / "slide"),
             "-k",
             "4",
+            "-j",
+            "0",
         ]
     )
 
@@ -276,10 +278,12 @@ def test_clean_command_delete(script_runner) -> None:  # noqa
             "histoslice",
             "clean",
             "-i",
-            str(TMP_DIRECTORY / "slide" / "metadata.parquet"),
+            str(TMP_DIRECTORY / "slide"),
             "-k",
             "4",
             "--delete",
+            "-j",
+            "0",
         ]
     )
 
@@ -297,7 +301,7 @@ def test_clean_command_delete(script_runner) -> None:  # noqa
 
 
 def test_clean_command_no_metadata(script_runner) -> None:  # noqa
-    """Test clean command with non-existent metadata file."""
+    """Test clean command with non-existent directory."""
     clean_temporary_directory()
 
     ret = script_runner.run(
@@ -307,11 +311,11 @@ def test_clean_command_no_metadata(script_runner) -> None:  # noqa
             "histoslice",
             "clean",
             "-i",
-            str(TMP_DIRECTORY / "nonexistent" / "metadata.parquet"),
+            str(TMP_DIRECTORY / "nonexistent"),
         ]
     )
 
-    # Should fail because no metadata files found
+    # Should fail because no slide directories found
     assert not ret.success
     clean_temporary_directory()
 
@@ -344,9 +348,11 @@ def test_clean_command_csv_format(script_runner) -> None:  # noqa
             "histoslice",
             "clean",
             "-i",
-            str(TMP_DIRECTORY / "slide" / "metadata.csv"),
+            str(TMP_DIRECTORY / "slide"),
             "-k",
             "4",
+            "-j",
+            "0",
         ]
     )
 
@@ -383,7 +389,7 @@ def test_clean_command_invalid_mode(script_runner) -> None:  # noqa
             "histoslice",
             "clean",
             "-i",
-            str(TMP_DIRECTORY / "slide" / "metadata.parquet"),
+            str(TMP_DIRECTORY / "slide"),
             "--mode",
             "invalid_mode",
         ]
@@ -397,13 +403,15 @@ def test_clean_command_invalid_mode(script_runner) -> None:  # noqa
 
 
 def test_clean_command_unsupported_format(script_runner) -> None:  # noqa
-    """Test clean command with unsupported file format."""
+    """Test clean command with directory without metadata."""
     clean_temporary_directory()
 
-    # Create a dummy file with unsupported format
+    # Create a directory without metadata
     TMP_DIRECTORY.mkdir(parents=True, exist_ok=True)
-    dummy_file = TMP_DIRECTORY / "metadata.txt"
-    dummy_file.write_text("dummy content")
+    test_dir = TMP_DIRECTORY / "slide"
+    test_dir.mkdir(exist_ok=True)
+    # Create a dummy file but no metadata
+    (test_dir / "dummy.txt").write_text("dummy content")
 
     # Run clean command
     ret = script_runner.run(
@@ -413,13 +421,12 @@ def test_clean_command_unsupported_format(script_runner) -> None:  # noqa
             "histoslice",
             "clean",
             "-i",
-            str(dummy_file),
+            str(test_dir),
         ]
     )
 
-    # Should succeed but skip the unsupported file
-    assert ret.success
-    assert "Skipping unsupported file format" in ret.stdout
+    # Should fail because no directories with metadata found
+    assert not ret.success
 
     clean_temporary_directory()
 
@@ -454,9 +461,11 @@ def test_clean_command_missing_tile_files(script_runner) -> None:  # noqa
             "histoslice",
             "clean",
             "-i",
-            str(TMP_DIRECTORY / "slide" / "metadata.parquet"),
+            str(TMP_DIRECTORY / "slide"),
             "-k",
             "4",
+            "-j",
+            "0",
         ]
     )
 
@@ -492,7 +501,9 @@ def test_clean_command_exception_handling(script_runner, monkeypatch) -> None:  
             "histoslice",
             "clean",
             "-i",
-            str(metadata_file),
+            str(TMP_DIRECTORY / "slide"),
+            "-j",
+            "0",
         ]
     )
 
@@ -528,13 +539,17 @@ def test_clean_command_no_outliers(script_runner) -> None:  # noqa
             "histoslice",
             "clean",
             "-i",
-            str(TMP_DIRECTORY / "slide" / "metadata.parquet"),
+            str(TMP_DIRECTORY / "slide"),
             "-k",
             "2",
+            "-j",
+            "0",
         ]
     )
 
     assert ret.success
     # The output should mention either detection or no outliers
+
+    clean_temporary_directory()
 
     clean_temporary_directory()
