@@ -60,12 +60,14 @@ dev = [
     "pytest==8.4.2",
     "pytest-console-scripts==1.4.1",
     "pytest-cov==7.0.0",
+    "pytest-timeout==2.3.1",
     "ruff==0.14.1",
 ]
 
 [tool.pytest.ini_options]
 norecursedirs = "test/data/*"
-addopts = "--doctest-modules --cov=histoslice --cov-branch --cov-report=xml"
+addopts = "--doctest-modules --cov=histoslice --cov-branch --cov-report=xml --timeout=60"
+timeout = 60
 script_launch_mode = "subprocess"
 
 [build-system]
