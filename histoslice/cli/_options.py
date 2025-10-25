@@ -329,3 +329,63 @@ class CutSlideKwargs(TypedDict):
     tissue_kwargs: TissueKwargs
     tile_kwargs: TileKwargs
     save_kwargs: SaveKwargs
+
+
+# ---- Clean options ----
+def clean_opts(
+    input_pattern: Annotated[
+        str,
+        typer.Option(
+            "--input",
+            "-i",
+            help="Directory pattern to glob for slide outputs (e.g., './tiles/*' or './tiles/slide_*').",
+            rich_help_panel="Input",
+        ),
+    ],
+    mode: Annotated[
+        str,
+        typer.Option(
+            "--mode",
+            "-m",
+            help="Outlier detection mode.",
+            rich_help_panel="Outlier detection",
+        ),
+    ] = "clustering",
+    num_clusters: Annotated[
+        int,
+        typer.Option(
+            "--num-clusters",
+            "-k",
+            min=2,
+            help="Number of clusters for k-means clustering.",
+            rich_help_panel="Outlier detection",
+        ),
+    ] = 4,
+    delete: Annotated[
+        bool,
+        typer.Option(
+            "--delete",
+            "-d",
+            help="Delete detected outlier images. If not specified, moves to 'outliers' subdirectory.",
+            rich_help_panel="Output",
+        ),
+    ] = False,
+    num_workers: Annotated[
+        Optional[int],
+        typer.Option(
+            "--num-workers",
+            "-j",
+            min=0,
+            show_default="CPU-count",
+            help="Number of parallel workers for processing slides.",
+            rich_help_panel="Output",
+        ),
+    ] = None,
+) -> Dict:
+    return {
+        "input_pattern": input_pattern,
+        "mode": mode,
+        "num_clusters": num_clusters,
+        "delete": delete,
+        "num_workers": num_workers,
+    }

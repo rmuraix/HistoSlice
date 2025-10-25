@@ -98,21 +98,52 @@ tiles
 
 Histological slide images often contain areas that we would not like to include into our training data. Might seem like a daunting task but let's try it out!
 
-```python
-from histoslice.utils import OutlierDetector
+=== "CLI"
+    ```bash
+    # First, extract tiles with metrics
+    histoslice slice \
+        --input './images/*.tiff' \
+        --output ./tiles \
+        --width 512 \
+        --metrics
+    
+    # Then, detect and remove outliers using clustering
+    # Specify the parent directory containing slide outputs
+    histoslice clean \
+        --input './tiles/*' \
+        --num-clusters 4
+    
+    # Or delete outliers instead of moving them
+    histoslice clean \
+        --input './tiles/*' \
+        --num-clusters 4 \
+        --delete
+    
+    # For parallel processing of multiple slides
+    histoslice clean \
+        --input './tiles/*' \
+        --num-clusters 4 \
+        --num-workers 4
+    ```
 
-# Let's wrap the tile metadata with a helper class.
-detector = OutlierDetector(tile_metadata)
-# Cluster tiles based on image metrics.
-clusters = detector.cluster_kmeans(num_clusters=4, random_state=666)
-# Visualise first cluster.
-reader.get_annotated_thumbnail(
-    image=reader.read_level(-1), coordinates=detector.coordinates[clusters == 0]
-)
-```
+=== "Python API"
+    ```python
+    from histoslice.utils import OutlierDetector
+
+    # Let's wrap the tile metadata with a helper class.
+    detector = OutlierDetector(tile_metadata)
+    # Cluster tiles based on image metrics.
+    clusters = detector.cluster_kmeans(num_clusters=4, random_state=666)
+    # Visualise first cluster.
+    reader.get_annotated_thumbnail(
+        image=reader.read_level(-1), coordinates=detector.coordinates[clusters == 0]
+    )
+    ```
 
 Now we can mark tiles in cluster `0` as outliers!
 
 ![Tiles in cluster 0](https://github.com/rmuraix/HistoSlice/blob/main/images/thumbnail_blue.jpeg?raw=true)
+
+The `clean` command automatically detects outliers in cluster 0 (the cluster most distant from the mean cluster center after k-means clustering orders them by distance) and either moves them to an `outliers` subdirectory (default) or deletes them (with `--delete` flag). The command supports parallel processing of multiple slides using the `--num-workers` option.
 
 For more information on how to use the `OutlierDetector`, see the [API documentation](api/public/outlierdetector/).

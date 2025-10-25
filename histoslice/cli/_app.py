@@ -19,13 +19,16 @@ from histoslice.cli._options import (
     SaveKwargs,
     TileKwargs,
     TissueKwargs,
+    clean_opts,
     io_opts,
     save_opts,
     tile_opts,
     tissue_opts,
 )
 
-app = TyperDI(name="histoslice", help="Cut histological slides into small tile images.")
+app = TyperDI(
+    name="histoslice", help="Tools for preprocessing histological slide images."
+)
 
 
 @app.command("slice")
@@ -97,6 +100,150 @@ def cut_slides(
             ):
                 if isinstance(exception, Exception):
                     warning(f"Could not process {path} due to exception: {exception!r}")
+
+
+@app.command("clean")
+def clean_tiles(
+    clean: Annotated[Dict, Depends(clean_opts)],
+) -> None:
+    """Detect and remove outlier tile images using clustering."""
+    import glob
+    from pathlib import Path
+
+    # Validate mode
+    if clean["mode"] != "clustering":
+        error(
+            f"Unknown mode '{clean['mode']}'. Currently only 'clustering' is supported."
+        )
+
+    # Find slide directories (each containing tiles and metadata)
+    slide_dirs = []
+    for path in glob.glob(clean["input_pattern"], recursive=True):
+        path = Path(path)
+        if path.is_dir():
+            # Check if directory contains metadata
+            metadata_files = list(path.glob("metadata.parquet")) + list(
+                path.glob("metadata.csv")
+            )
+            if metadata_files:
+                slide_dirs.append(path)
+
+    if not slide_dirs:
+        error(
+            f"Found no slide directories with metadata matching pattern '{clean['input_pattern']}'."
+        )
+
+    info(f"Found {len(slide_dirs)} slide(s) to process.")
+
+    # Prepare kwargs for processing
+    clean_kwargs = {
+        "mode": clean["mode"],
+        "num_clusters": clean["num_clusters"],
+        "delete": clean["delete"],
+    }
+
+    # Resolve num_workers
+    effective_workers = (
+        (os.cpu_count() or 1) if clean["num_workers"] is None else clean["num_workers"]
+    )
+
+    if effective_workers == 0:
+        # Sequential processing
+        for slide_dir in slide_dirs:
+            _, exception = process_slide_outliers(slide_dir, **clean_kwargs)
+            if isinstance(exception, Exception):
+                warning(
+                    f"Could not process {slide_dir} due to exception: {exception!r}"
+                )
+    else:
+        # Parallel processing
+        with mpire.WorkerPool(n_jobs=effective_workers) as pool:
+            for slide_dir, exception in pool.imap(
+                func=functools.partial(process_slide_outliers, **clean_kwargs),
+                iterable_of_args=slide_dirs,
+                progress_bar=True,
+                progress_bar_options={"desc": "Cleaning slides"},
+            ):
+                if isinstance(exception, Exception):
+                    warning(
+                        f"Could not process {slide_dir} due to exception: {exception!r}"
+                    )
+
+
+def process_slide_outliers(
+    slide_dir: Path,
+    *,
+    mode: str,
+    num_clusters: int,
+    delete: bool,
+) -> tuple[Path, Optional[Exception]]:
+    """Process a single slide directory for outlier detection and removal.
+
+    Args:
+        slide_dir: Path to slide directory containing metadata and tiles
+        mode: Outlier detection mode (currently only 'clustering')
+        num_clusters: Number of clusters for k-means
+        delete: If True, delete outliers; if False, move to 'outliers' subdirectory
+
+    Returns:
+        Tuple of (slide_dir, exception). Exception is None if successful.
+    """
+    import shutil
+    from pathlib import Path
+
+    from histoslice.utils import OutlierDetector
+
+    try:
+        # Find metadata file
+        metadata_path = None
+        if (slide_dir / "metadata.parquet").exists():
+            metadata_path = slide_dir / "metadata.parquet"
+        elif (slide_dir / "metadata.csv").exists():
+            metadata_path = slide_dir / "metadata.csv"
+        else:
+            return slide_dir, ValueError(f"No metadata file found in {slide_dir}")
+
+        # Load metadata
+        if metadata_path.suffix == ".parquet":
+            detector = OutlierDetector.from_parquet(metadata_path)
+        else:
+            detector = OutlierDetector.from_csv(metadata_path)
+
+        # Perform clustering
+        clusters = detector.cluster_kmeans(num_clusters=num_clusters)
+
+        # Cluster 0 contains outliers after reordering by distance from mean center.
+        # The cluster_kmeans method orders clusters by distance from the mean cluster
+        # center, so cluster 0 is the most distant (likely outliers).
+        outlier_mask = clusters == 0
+        num_outliers = outlier_mask.sum()
+
+        if num_outliers == 0:
+            return slide_dir, None
+
+        # Get paths of outlier tiles
+        outlier_paths = detector.paths[outlier_mask]
+
+        # Process each outlier tile
+        for tile_path in outlier_paths:
+            tile_path = Path(tile_path)
+            if not tile_path.exists():
+                continue
+
+            if delete:
+                # Delete the file
+                tile_path.unlink()
+            else:
+                # Move to outliers subdirectory
+                outliers_dir = slide_dir / "outliers"
+                outliers_dir.mkdir(exist_ok=True)
+                destination = outliers_dir / tile_path.name
+                shutil.move(str(tile_path), str(destination))
+
+        return slide_dir, None
+
+    except Exception as e:
+        return slide_dir, e
 
 
 def filter_slide_paths(  # noqa
