@@ -519,11 +519,11 @@ class SlideReader:
             # Downscale thumbnail if too large to prevent JPEG size limits and reduce disk space
             thumbnail_small = F.downscale_for_thumbnail(thumbnail)
 
-            Image.fromarray(thumbnail_small).save(output_dir / "thumbnail.jpeg")
+            Image.fromarray(thumbnail_small).save(str(output_dir / "thumbnail.jpeg"))
             thumbnail_regions = self.get_annotated_thumbnail(
                 thumbnail_small, coordinates
             )
-            thumbnail_regions.save(output_dir / f"thumbnail_{image_dir}.jpeg")
+            thumbnail_regions.save(str(output_dir / f"thumbnail_{image_dir}.jpeg"))
             if (
                 isinstance(coordinates, (TileCoordinates, SpotCoordinates))
                 and coordinates.tissue_mask is not None
@@ -545,7 +545,7 @@ class SlideReader:
                     tissue_mask_resized = original_tissue_mask
 
                 Image.fromarray(255 - 255 * tissue_mask_resized).save(
-                    output_dir / "thumbnail_tissue.jpeg"
+                    str(output_dir / "thumbnail_tissue.jpeg")
                 )
         metadata = _save_regions(
             output_dir=output_dir,
@@ -610,13 +610,13 @@ class RegionData:
         # Save image.
         image_path = image_dir / f"{filename}.{image_format}"
         image_path.parent.mkdir(parents=True, exist_ok=True)
-        Image.fromarray(self.image).save(image_path, quality=quality)
+        Image.fromarray(self.image).save(str(image_path), quality=quality)
         metadata["path"] = str(image_path.resolve())
         # Save mask.
         if self.mask is not None:
             mask_path = mask_dir / f"{filename}.png"
             mask_path.parent.mkdir(parents=True, exist_ok=True)
-            Image.fromarray(self.mask).save(mask_path)
+            Image.fromarray(self.mask).save(str(mask_path))
             metadata["mask_path"] = str(mask_path.resolve())
         return {**metadata, **self.metrics}
 
