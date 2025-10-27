@@ -95,7 +95,9 @@ def test_get_level_methods() -> None:
 def test_tissue_mask() -> None:
     reader = SlideReader(SLIDE_PATH_JPEG)
     last_level = reader.level_count - 1
-    threshold, tissue_mask = reader.get_tissue_mask(level=last_level, sigma=0.5, threshold=200)
+    threshold, tissue_mask = reader.get_tissue_mask(
+        level=last_level, sigma=0.5, threshold=200
+    )
     assert tissue_mask.shape == reader.level_dimensions[last_level]
     assert threshold == 200
     downsample = F.get_downsample(tissue_mask, reader.dimensions)
