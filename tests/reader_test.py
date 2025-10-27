@@ -217,7 +217,6 @@ def test_yield_regions() -> None:
     assert tile_coords.coordinates == yielded_coords
 
 
-@pytest.mark.skip(reason="PyVips backend has issues with multiprocessing in CI")
 def test_yield_regions_concurrent() -> None:
     reader = SlideReader(SLIDE_PATH_JPEG)
     tile_coords = reader.get_tile_coordinates(tissue_mask=None, width=512, height=256)
@@ -270,7 +269,6 @@ def test_save_regions() -> None:
     clean_temporary_directory()
 
 
-@pytest.mark.skip(reason="PyVips backend has issues with multiprocessing in CI")
 def test_save_regions_concurrent() -> None:
     reader = SlideReader(SLIDE_PATH_JPEG)
     clean_temporary_directory()

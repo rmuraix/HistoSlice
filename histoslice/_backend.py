@@ -265,11 +265,14 @@ class PyVipsBackend(SlideReaderBackend):
             raise ImportError(ERROR_PYVIPS_IMPORT) from PYVIPS_ERROR
 
         super().__init__(path)
-        self.__path = path
+        # Convert path to string for pyvips compatibility across Python versions
+        self.__path = str(Path(path) if not isinstance(path, Path) else path)
 
         # Try loading with page parameter first (for pyramidal images like TIFF)
         try:
-            self.__img0 = pyvips.Image.new_from_file(path, access="random", page=0)
+            self.__img0 = pyvips.Image.new_from_file(
+                self.__path, access="random", page=0
+            )
             # libvips exposes the pyramid levels as pages.
             try:
                 n_pages = int(self.__img0.get("n-pages"))
@@ -278,17 +281,19 @@ class PyVipsBackend(SlideReaderBackend):
                 n_pages = 1
         except pyvips.error.Error:
             # For non-pyramidal images (like JPEG), load without page parameter
-            self.__img0 = pyvips.Image.new_from_file(path, access="random")
+            self.__img0 = pyvips.Image.new_from_file(self.__path, access="random")
             n_pages = 1
 
         # Build (height, width) per level. pyvips uses width/height props.
         level_dims: Dict[int, Tuple[int, int]] = {}
         for lvl in range(n_pages):
             try:
-                page = pyvips.Image.new_from_file(path, access="random", page=lvl)
+                page = pyvips.Image.new_from_file(
+                    self.__path, access="random", page=lvl
+                )
             except pyvips.error.Error:
                 # For non-pyramidal images, just use the main image
-                page = pyvips.Image.new_from_file(path, access="random")
+                page = pyvips.Image.new_from_file(self.__path, access="random")
             # Ensure dimensions are (H, W) to match user's class contract.
             level_dims[lvl] = (int(page.height), int(page.width))
         self.__level_dimensions = level_dims

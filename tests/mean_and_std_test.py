@@ -1,5 +1,3 @@
-import pytest
-
 import histoslice.functional as F
 from histoslice import SlideReader
 
@@ -27,7 +25,6 @@ def test_mean_and_std_from_paths() -> None:
     assert [round(x, 2) for x in std] == [0.14, 0.19, 0.14]
 
 
-@pytest.mark.skip(reason="PyVips backend has issues with multiprocessing in CI")
 def test_mean_and_std_from_paths_multiprocessing() -> None:
     """Test get_mean_and_std_from_paths with multiple workers."""
     reader = SlideReader(SLIDE_PATH_JPEG)
