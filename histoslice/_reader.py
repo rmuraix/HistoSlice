@@ -452,7 +452,6 @@ class SlideReader:
         thumbnail_level: Optional[int] = None,
         image_format: str = "jpeg",
         quality: int = 80,
-        use_csv: bool = False,
         num_workers: int = 1,
         raise_exception: bool = True,
         verbose: bool = True,
@@ -479,8 +478,6 @@ class SlideReader:
                 Defaults to None.
             image_format: File format for `Pillow` image writer. Defaults to "jpeg".
             quality: JPEG compression quality if `format="jpeg"`. Defaults to 80.
-            use_csv: Save metadata to csv-files instead of parquet-files. Defaults to
-                False.
             num_workers: Number of data saving workers. Defaults to 1.
             raise_exception: Whether to raise an exception if there are problems with
                 reading tile regions. Defaults to True.
@@ -569,10 +566,7 @@ class SlideReader:
             else None,
             verbose=verbose,
         )
-        if use_csv:
-            metadata.write_csv(output_dir / "metadata.csv")
-        else:
-            metadata.write_parquet(output_dir / "metadata.parquet")
+        metadata.write_parquet(output_dir / "metadata.parquet")
         return metadata
 
     def __repr__(self) -> str:

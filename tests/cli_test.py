@@ -320,53 +320,6 @@ def test_clean_command_no_metadata(script_runner) -> None:  # noqa
     clean_temporary_directory()
 
 
-def test_clean_command_csv_format(script_runner) -> None:  # noqa
-    """Test clean command with CSV metadata format."""
-    from histoslice import SlideReader
-
-    clean_temporary_directory()
-    # Create tiles with CSV metadata
-    reader = SlideReader(SLIDE_PATH_JPEG)
-    reader.save_regions(
-        TMP_DIRECTORY,
-        reader.get_tile_coordinates(None, 256, overlap=0.0),
-        save_metrics=True,
-        threshold=200,
-        use_csv=True,
-    )
-
-    # Count initial tiles
-    tiles_dir = TMP_DIRECTORY / "slide" / "tiles"
-    initial_tile_count = len(list(tiles_dir.glob("*.jpeg")))
-    assert initial_tile_count > 0
-
-    # Run clean command with CSV metadata
-    ret = script_runner.run(
-        [
-            "uv",
-            "run",
-            "histoslice",
-            "clean",
-            "-i",
-            str(TMP_DIRECTORY / "slide"),
-            "-k",
-            "4",
-            "-j",
-            "0",
-        ]
-    )
-
-    assert ret.success
-
-    # Check that outliers were moved
-    outliers_dir = TMP_DIRECTORY / "slide" / "outliers"
-    assert outliers_dir.exists()
-    moved_count = len(list(outliers_dir.glob("*.jpeg")))
-    assert moved_count > 0
-
-    clean_temporary_directory()
-
-
 def test_clean_command_invalid_mode(script_runner) -> None:  # noqa
     """Test clean command with invalid mode."""
     from histoslice import SlideReader

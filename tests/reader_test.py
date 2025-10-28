@@ -399,24 +399,7 @@ def test_save_regions_thumbnail_size_limit() -> None:
     clean_temporary_directory()
 
 
-def test_save_regions_with_csv() -> None:
-    reader = SlideReader(SLIDE_PATH_JPEG)
-    clean_temporary_directory()
-    regions = F.get_tile_coordinates(reader.dimensions, 512)
-    metadata = reader.save_regions(TMP_DIRECTORY, regions, use_csv=True)
-    assert isinstance(metadata, pl.DataFrame)
-    assert metadata.columns == ["x", "y", "w", "h", "path"]
-    assert sorted([f.name for f in (TMP_DIRECTORY / reader.name).iterdir()]) == sorted(
-        [
-            "thumbnail.jpeg",
-            "thumbnail_tiles.jpeg",
-            "tiles",
-            "metadata.csv",
-        ]
-    )
-
-
-def test_save_regions_no_threshold() -> None:
+def test_save_regions_without_metrics() -> None:
     reader = SlideReader(SLIDE_PATH_JPEG)
     regions = F.get_tile_coordinates(reader.dimensions, 512)
     clean_temporary_directory()

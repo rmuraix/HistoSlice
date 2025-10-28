@@ -72,7 +72,6 @@ def cut_slides(
             "save_thumbnails": cfg.save_thumbnails,
             "image_format": cfg.image_format,
             "quality": cfg.quality,
-            "use_csv": cfg.use_csv,
             "raise_exception": False,  # handled here
             "num_workers": 0,  # slide-per-process
             "overwrite": True,  # filtered earlier
@@ -122,9 +121,7 @@ def clean_tiles(
         path = Path(path)
         if path.is_dir():
             # Check if directory contains metadata
-            metadata_files = list(path.glob("metadata.parquet")) + list(
-                path.glob("metadata.csv")
-            )
+            metadata_files = list(path.glob("metadata.parquet"))
             if metadata_files:
                 slide_dirs.append(path)
 
@@ -198,16 +195,11 @@ def process_slide_outliers(
         metadata_path = None
         if (slide_dir / "metadata.parquet").exists():
             metadata_path = slide_dir / "metadata.parquet"
-        elif (slide_dir / "metadata.csv").exists():
-            metadata_path = slide_dir / "metadata.csv"
         else:
             return slide_dir, ValueError(f"No metadata file found in {slide_dir}")
 
         # Load metadata
-        if metadata_path.suffix == ".parquet":
-            detector = OutlierDetector.from_parquet(metadata_path)
-        else:
-            detector = OutlierDetector.from_csv(metadata_path)
+        detector = OutlierDetector.from_parquet(metadata_path)
 
         # Perform clustering
         clusters = detector.cluster_kmeans(num_clusters=num_clusters)
@@ -260,9 +252,7 @@ def filter_slide_paths(  # noqa
             continue
         output_dir = parent_dir / path.name.removesuffix(path.suffix)
         if output_dir.exists():
-            if (output_dir / "metadata.parquet").exists() or (
-                output_dir / "metadata.csv"
-            ).exists():
+            if (output_dir / "metadata.parquet").exists():
                 processed.append(path)
             else:
                 interrupted.append(path)

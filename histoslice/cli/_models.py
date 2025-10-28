@@ -37,7 +37,6 @@ class Settings(BaseModel):
     image_format: str = "jpeg"
     quality: int = Field(default=80, ge=0, le=100)
     num_workers: Optional[int] = None
-    use_csv: bool = False
 
     @model_validator(mode="after")
     def _strict_ranges(self):
