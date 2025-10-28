@@ -58,11 +58,6 @@ class OutlierDetector:
         """Wrapper around `polars.read_parquet` function."""
         return cls(pl.read_parquet(*args, **kwargs))
 
-    @classmethod
-    def from_csv(cls, *args, **kwargs) -> "OutlierDetector":
-        """Wrapper around `polars.read_csv` function."""
-        return cls(pl.read_csv(*args, **kwargs))
-
     @property
     def dataframe(self) -> pl.DataFrame:
         """Polars dataframe with metadata."""

@@ -316,7 +316,6 @@ class SaveKwargs(TypedDict):
     save_thumbnails: bool
     image_format: str
     quality: int
-    use_csv: bool
     raise_exception: bool
     num_workers: int
     overwrite: bool

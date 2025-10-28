@@ -58,13 +58,6 @@ def test_metadata_from_parquet() -> None:
     clean_temporary_directory()
 
 
-def test_metadata_from_csv() -> None:
-    generate_metadata(clean_tmp=False, use_csv=True)
-    metadata = OutlierDetector.from_csv(TMP_DIRECTORY / "slide" / "*.csv")
-    assert len(metadata.metric_columns) == 64
-    clean_temporary_directory()
-
-
 def test_metadata_plot_histogram() -> None:
     metadata = OutlierDetector(generate_metadata(clean_tmp=False))
     metadata.plot_histogram("red_mean", num_images=0)
