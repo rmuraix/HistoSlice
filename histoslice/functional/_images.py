@@ -10,6 +10,7 @@ from PIL import Image
 
 from ._concurrent import DEFAULT_START_METHOD
 
+
 def get_random_image_collage(
     paths: Iterable[Union[str, Path]],
     num_rows: int = 4,
