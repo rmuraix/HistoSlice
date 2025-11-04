@@ -38,6 +38,7 @@ markdown_extensions:
   - pymdownx.blocks.caption
 nav:
   - Home: index.md
+  - CLI Reference: cli.md
   - Metadata Reference: metadata.md
   - API Reference:
     - SlideReader: api/public/slidereader.md
@@ -45,7 +46,3 @@ nav:
 plugins:
   - search
   - mkdocstrings
-nav:
-  - Home: index.md
-  - CLI Reference: cli.md
-  - API Reference: api/
