@@ -1,0 +1,5 @@
+- Install environment: `uv sync`
+- Lint/format: `uv run ruff check .`
+- Run tests: `uv run pytest -q`
+- Build docs: `uv run mkdocs build` (or `uv run mkdocs serve` for live preview)
+- CLI help: `uv run histoslice --help`
