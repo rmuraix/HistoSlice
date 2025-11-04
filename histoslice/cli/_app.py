@@ -97,10 +97,9 @@ def cut_slides(
         with ProcessPoolExecutor(max_workers=effective_workers, mp_context=ctx) as pool:
             func = functools.partial(cut_slide, **kwargs)
             futures = {pool.submit(func, path): path for path in paths}
-            for future in tqdm(
-                as_completed(futures), desc="Cutting slides", total=len(paths)
-            ):
-                path, exception = future.result()
+            func = functools.partial(cut_slide, **kwargs)
+            results = pool.map(func, paths)
+            for path, exception in tqdm(results, desc="Cutting slides", total=len(paths)):
                 if isinstance(exception, Exception):
                     warning(f"Could not process {path} due to exception: {exception!r}")
 
