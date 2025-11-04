@@ -1,3 +1,4 @@
+import sys
 from collections.abc import Callable, Iterable
 from functools import partial
 from pathlib import Path
@@ -5,7 +6,13 @@ from typing import Optional
 
 from mpire import WorkerPool
 
-DEFAULT_START_METHOD = "spawn"
+# Set default start method based on Python version.
+# Python <3.12 has a hang issue when using spawn.
+# In Python 3.12+, fork is deprecated.
+if (sys.version_info[0] == 3) and (sys.version_info[1] >= 12):
+    DEFAULT_START_METHOD = "spawn"
+else:
+    DEFAULT_START_METHOD = "fork"
 
 
 def worker_init(worker_state, reader_class, path: Path, backend: str) -> None:  # noqa
