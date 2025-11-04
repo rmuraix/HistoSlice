@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image
 
 from ._check import check_image
+from ._concurrent import DEFAULT_START_METHOD
 
 MEAN = tuple[float, ...]
 STD = tuple[float, ...]
@@ -43,7 +44,9 @@ def get_mean_and_std_from_paths(
     """
     if num_workers <= 1:
         return get_mean_and_std_from_images(_read_image(x) for x in paths)
-    with mpire.WorkerPool(n_jobs=num_workers) as pool:
+    with mpire.WorkerPool(
+        n_jobs=num_workers, start_method=DEFAULT_START_METHOD
+    ) as pool:
         images = pool.imap(_read_image, ((x,) for x in paths), iterable_len=len(paths))
         return get_mean_and_std_from_images(images)
 

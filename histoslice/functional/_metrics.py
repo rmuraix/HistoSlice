@@ -147,11 +147,13 @@ def _get_channel_quantiles(
     name: str,
 ) -> dict[str, int]:
     """Calculate quantile values for the channel."""
-    # Get quantiles.
     output = {}
     bins = np.cumsum(np.bincount(channel[tissue_mask == 1].flatten(), minlength=256))
+    n_pixels = (tissue_mask == 1).sum()
+
     for q in quantiles:
-        output[f"{name}_q{int(100 * q)}"] = int(
-            np.argwhere(bins > int(q * (tissue_mask == 1).sum()))[0]
-        )
+        threshold = int(q * n_pixels)
+        idx = np.flatnonzero(bins > threshold)[0]
+        output[f"{name}_q{int(100 * q)}"] = int(idx)
+
     return output
