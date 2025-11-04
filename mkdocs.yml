@@ -39,3 +39,7 @@ markdown_extensions:
 plugins:
   - search
   - mkdocstrings
+nav:
+  - Home: index.md
+  - CLI Reference: cli.md
+  - API Reference: api/
