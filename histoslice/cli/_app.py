@@ -4,7 +4,7 @@ import functools
 import multiprocessing as mp
 import os
 import sys
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, NoReturn, Optional
 
@@ -96,8 +96,10 @@ def cut_slides(
         ctx = mp.get_context(DEFAULT_START_METHOD)
         with ProcessPoolExecutor(max_workers=effective_workers, mp_context=ctx) as pool:
             func = functools.partial(cut_slide, **kwargs)
-            futures = [pool.submit(func, path) for path in paths]
-            for future in tqdm(futures, desc="Cutting slides", total=len(paths)):
+            futures = {pool.submit(func, path): path for path in paths}
+            for future in tqdm(
+                as_completed(futures), desc="Cutting slides", total=len(paths)
+            ):
                 path, exception = future.result()
                 if isinstance(exception, Exception):
                     warning(f"Could not process {path} due to exception: {exception!r}")
@@ -159,8 +161,12 @@ def clean_tiles(
         ctx = mp.get_context(DEFAULT_START_METHOD)
         with ProcessPoolExecutor(max_workers=effective_workers, mp_context=ctx) as pool:
             func = functools.partial(process_slide_outliers, **clean_kwargs)
-            futures = [pool.submit(func, slide_dir) for slide_dir in slide_dirs]
-            for future in tqdm(futures, desc="Cleaning slides", total=len(slide_dirs)):
+            futures = {
+                pool.submit(func, slide_dir): slide_dir for slide_dir in slide_dirs
+            }
+            for future in tqdm(
+                as_completed(futures), desc="Cleaning slides", total=len(slide_dirs)
+            ):
                 slide_dir, exception = future.result()
                 if isinstance(exception, Exception):
                     warning(
