@@ -1,13 +1,15 @@
 """CLI interface for cutting slides into small tile images."""
 
 import functools
+import multiprocessing as mp
 import os
 import sys
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Dict, NoReturn, Optional
 
-import mpire
 import typer
+from tqdm import tqdm
 from typer_di import Depends, TyperDI
 from typing_extensions import Annotated
 
@@ -91,16 +93,12 @@ def cut_slides(
             if isinstance(exception, Exception):
                 warning(f"Could not process {path} due to exception: {exception!r}")
     else:
-        with mpire.WorkerPool(
-            n_jobs=effective_workers,
-            start_method=DEFAULT_START_METHOD,
-        ) as pool:
-            for path, exception in pool.imap(
-                func=functools.partial(cut_slide, **kwargs),
-                iterable_of_args=paths,
-                progress_bar=True,
-                progress_bar_options={"desc": "Cutting slides"},
-            ):
+        ctx = mp.get_context(DEFAULT_START_METHOD)
+        with ProcessPoolExecutor(max_workers=effective_workers, mp_context=ctx) as pool:
+            func = functools.partial(cut_slide, **kwargs)
+            futures = [pool.submit(func, path) for path in paths]
+            for future in tqdm(futures, desc="Cutting slides", total=len(paths)):
+                path, exception = future.result()
                 if isinstance(exception, Exception):
                     warning(f"Could not process {path} due to exception: {exception!r}")
 
@@ -158,16 +156,12 @@ def clean_tiles(
                 )
     else:
         # Parallel processing
-        with mpire.WorkerPool(
-            n_jobs=effective_workers,
-            start_method=DEFAULT_START_METHOD,
-        ) as pool:
-            for slide_dir, exception in pool.imap(
-                func=functools.partial(process_slide_outliers, **clean_kwargs),
-                iterable_of_args=slide_dirs,
-                progress_bar=True,
-                progress_bar_options={"desc": "Cleaning slides"},
-            ):
+        ctx = mp.get_context(DEFAULT_START_METHOD)
+        with ProcessPoolExecutor(max_workers=effective_workers, mp_context=ctx) as pool:
+            func = functools.partial(process_slide_outliers, **clean_kwargs)
+            futures = [pool.submit(func, slide_dir) for slide_dir in slide_dirs]
+            for future in tqdm(futures, desc="Cleaning slides", total=len(slide_dirs)):
+                slide_dir, exception = future.result()
                 if isinstance(exception, Exception):
                     warning(
                         f"Could not process {slide_dir} due to exception: {exception!r}"

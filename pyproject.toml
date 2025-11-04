@@ -27,7 +27,6 @@ readme = "README.md"
 dependencies = [
     "aicspylibczi>=3,<4",
     "matplotlib",
-    "mpire>=2.6",
     "numpy>=2",
     "opencv-python-headless>=4",
     "openslide-python>=1.4",
