@@ -4,7 +4,7 @@ from collections.abc import Callable, Iterable
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 # Set default start method based on Python version.
 # Python <3.12 has a hang issue when using spawn.
@@ -15,7 +15,10 @@ else:
     DEFAULT_START_METHOD = "fork"
 
 
-# Global state for worker processes (used instead of MPire's use_worker_state)
+# Global state for worker processes (used instead of MPire's use_worker_state).
+# Each worker process has its own copy of this dictionary, initialized by
+# _worker_init when the process starts. This is safe and intentional - worker
+# processes do not share state with each other or the parent process.
 _worker_state = {}
 
 
@@ -24,8 +27,13 @@ def _worker_init(reader_class, path: Path, backend: str) -> None:  # noqa
     _worker_state["reader"] = reader_class(path, backend)
 
 
-def _worker_fn_wrapper(worker_fn: Callable, args) -> any:
-    """Wrapper to call worker function with worker state."""
+def _worker_fn_wrapper(worker_fn: Callable, args) -> Any:
+    """Wrapper to call worker function with worker state.
+
+    Note: _worker_state is a process-local global that is initialized
+    per worker process by _worker_init. Each worker process maintains
+    its own reader instance in its own copy of _worker_state.
+    """
     return worker_fn(_worker_state, *args)
 
 
