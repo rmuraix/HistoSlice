@@ -1,0 +1,3 @@
+- Python style: 4-space indent, type hints throughout, snake_case for modules/functions, PascalCase for classes, UPPER_SNAKE_CASE for constants; prefer absolute imports within `histoslice`.
+- Tooling: ruff handles linting/formatting (run `uv run ruff check .`); pytest with doctests enabled (`pytest.ini`).
+- Guidelines: guard optional backends (e.g., OpenSlide/PyVips) gracefully; avoid committing large binaries or PHI; reuse fixtures/test assets under `tests/`.

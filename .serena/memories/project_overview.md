@@ -1,0 +1,4 @@
+- Purpose: HistoSlice provides tooling and a CLI to preprocess large histology slide images by slicing them into tiles, computing metrics, and filtering artifacts.
+- Tech stack: Python >=3.10 package with CLI; uses uv for environment management, pytest for testing, ruff for lint/format, mkdocs for docs.
+- Structure: `histoslice/` core library (reader, backends, data, CLI, functional image ops); `tests/` pytest suite plus fixtures and assets; `docs/` with mkdocs configuration; configuration in `pyproject.toml`, `mkdocs.yml`, `uv.lock`.
+- Entry points: `histoslice` CLI via uv (`uv run histoslice --help`) and Python API (`histoslice.SlideReader`, etc.).
