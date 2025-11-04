@@ -36,6 +36,12 @@ markdown_extensions:
   - pymdownx.arithmatex:
       generic: true
   - pymdownx.blocks.caption
+nav:
+  - Home: index.md
+  - Metadata Reference: metadata.md
+  - API Reference:
+    - SlideReader: api/public/slidereader.md
+    - OutlierDetector: api/public/outlierdetector.md
 plugins:
   - search
   - mkdocstrings
