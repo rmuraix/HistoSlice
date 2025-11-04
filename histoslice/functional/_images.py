@@ -8,6 +8,7 @@ import numpy as np
 from mpire import WorkerPool
 from PIL import Image
 
+from ._concurrent import DEFAULT_START_METHOD
 
 def get_random_image_collage(
     paths: Iterable[Union[str, Path]],
@@ -49,7 +50,10 @@ def read_images_from_paths(
     """
     if num_workers <= 1:
         return [_read_image(x) for x in paths]
-    with WorkerPool(n_jobs=num_workers) as pool:
+    with WorkerPool(
+        n_jobs=num_workers,
+        start_method=DEFAULT_START_METHOD,
+    ) as pool:
         output = list(pool.imap(_read_image, paths))
     return output  # noqa
 

@@ -5,6 +5,8 @@ from typing import Optional
 
 from mpire import WorkerPool
 
+DEFAULT_START_METHOD = "spawn"
+
 
 def worker_init(worker_state, reader_class, path: Path, backend: str) -> None:  # noqa
     """Worker initialization function for concurrent functions with reader."""
@@ -28,7 +30,11 @@ def prepare_worker_pool(
         path=reader.path,
         backend=reader._backend.BACKEND_NAME,
     )
-    pool = WorkerPool(n_jobs=num_workers, use_worker_state=True)
+    pool = WorkerPool(
+        n_jobs=num_workers,
+        use_worker_state=True,
+        start_method=DEFAULT_START_METHOD,
+    )
     iterable_of_args = pool.imap(
         func=worker_fn,
         iterable_of_args=iterable_of_args,

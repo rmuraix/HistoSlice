@@ -25,6 +25,7 @@ from histoslice.cli._options import (
     tile_opts,
     tissue_opts,
 )
+from histoslice.functional._concurrent import DEFAULT_START_METHOD
 
 app = TyperDI(
     name="histoslice", help="Tools for preprocessing histological slide images."
@@ -90,7 +91,10 @@ def cut_slides(
             if isinstance(exception, Exception):
                 warning(f"Could not process {path} due to exception: {exception!r}")
     else:
-        with mpire.WorkerPool(n_jobs=effective_workers) as pool:
+        with mpire.WorkerPool(
+            n_jobs=effective_workers,
+            start_method=DEFAULT_START_METHOD,
+        ) as pool:
             for path, exception in pool.imap(
                 func=functools.partial(cut_slide, **kwargs),
                 iterable_of_args=paths,
@@ -154,7 +158,10 @@ def clean_tiles(
                 )
     else:
         # Parallel processing
-        with mpire.WorkerPool(n_jobs=effective_workers) as pool:
+        with mpire.WorkerPool(
+            n_jobs=effective_workers,
+            start_method=DEFAULT_START_METHOD,
+        ) as pool:
             for slide_dir, exception in pool.imap(
                 func=functools.partial(process_slide_outliers, **clean_kwargs),
                 iterable_of_args=slide_dirs,
