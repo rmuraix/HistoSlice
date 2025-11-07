@@ -27,7 +27,7 @@ def _worker_init(reader_class, path: Path, backend: str) -> None:  # noqa
     _worker_state["reader"] = reader_class(path, backend)
 
 
-def _worker_fn_wrapper(worker_fn: Callable, args) -> Any:
+def _worker_fn_wrapper(worker_fn: Callable, args: tuple) -> Any:
     """Wrapper to call worker function with worker state.
 
     Note: _worker_state is a process-local global that is initialized
