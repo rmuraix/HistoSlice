@@ -4,7 +4,7 @@ import functools
 import multiprocessing as mp
 import os
 import sys
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Dict, NoReturn, Optional
 
@@ -160,13 +160,8 @@ def clean_tiles(
         ctx = mp.get_context(DEFAULT_START_METHOD)
         with ProcessPoolExecutor(max_workers=effective_workers, mp_context=ctx) as pool:
             func = functools.partial(process_slide_outliers, **clean_kwargs)
-            futures = {
-                pool.submit(func, slide_dir): slide_dir for slide_dir in slide_dirs
-            }
-            for future in tqdm(
-                as_completed(futures), desc="Cleaning slides", total=len(slide_dirs)
-            ):
-                slide_dir, exception = future.result()
+            results = pool.map(func, slide_dirs)
+            for slide_dir, exception in tqdm(results, desc="Cleaning slides", total=len(slide_dirs)):
                 if isinstance(exception, Exception):
                     warning(
                         f"Could not process {slide_dir} due to exception: {exception!r}"
