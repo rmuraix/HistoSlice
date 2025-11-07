@@ -4,7 +4,7 @@ import functools
 import multiprocessing as mp
 import os
 import sys
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, NoReturn, Optional
 
@@ -96,10 +96,13 @@ def cut_slides(
         ctx = mp.get_context(DEFAULT_START_METHOD)
         with ProcessPoolExecutor(max_workers=effective_workers, mp_context=ctx) as pool:
             func = functools.partial(cut_slide, **kwargs)
-            results = pool.map(func, paths)
-            for path, exception in tqdm(
-                results, desc="Cutting slides", total=len(paths)
+            # Submit all tasks and track with futures dict
+            futures = {pool.submit(func, path): path for path in paths}
+            # Use as_completed for responsive progress bar
+            for future in tqdm(
+                as_completed(futures), desc="Cutting slides", total=len(paths)
             ):
+                path, exception = future.result()
                 if isinstance(exception, Exception):
                     warning(f"Could not process {path} due to exception: {exception!r}")
 
@@ -160,10 +163,15 @@ def clean_tiles(
         ctx = mp.get_context(DEFAULT_START_METHOD)
         with ProcessPoolExecutor(max_workers=effective_workers, mp_context=ctx) as pool:
             func = functools.partial(process_slide_outliers, **clean_kwargs)
-            results = pool.map(func, slide_dirs)
-            for slide_dir, exception in tqdm(
-                results, desc="Cleaning slides", total=len(slide_dirs)
+            # Submit all tasks and track with futures dict
+            futures = {
+                pool.submit(func, slide_dir): slide_dir for slide_dir in slide_dirs
+            }
+            # Use as_completed for responsive progress bar
+            for future in tqdm(
+                as_completed(futures), desc="Cleaning slides", total=len(slide_dirs)
             ):
+                slide_dir, exception = future.result()
                 if isinstance(exception, Exception):
                     warning(
                         f"Could not process {slide_dir} due to exception: {exception!r}"
