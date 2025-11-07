@@ -161,7 +161,9 @@ def clean_tiles(
         with ProcessPoolExecutor(max_workers=effective_workers, mp_context=ctx) as pool:
             func = functools.partial(process_slide_outliers, **clean_kwargs)
             results = pool.map(func, slide_dirs)
-            for slide_dir, exception in tqdm(results, desc="Cleaning slides", total=len(slide_dirs)):
+            for slide_dir, exception in tqdm(
+                results, desc="Cleaning slides", total=len(slide_dirs)
+            ):
                 if isinstance(exception, Exception):
                     warning(
                         f"Could not process {slide_dir} due to exception: {exception!r}"
