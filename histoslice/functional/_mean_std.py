@@ -1,8 +1,9 @@
+import multiprocessing as mp
 from collections.abc import Iterable
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Union
 
-import mpire
 import numpy as np
 from PIL import Image
 
@@ -44,10 +45,10 @@ def get_mean_and_std_from_paths(
     """
     if num_workers <= 1:
         return get_mean_and_std_from_images(_read_image(x) for x in paths)
-    with mpire.WorkerPool(
-        n_jobs=num_workers, start_method=DEFAULT_START_METHOD
-    ) as pool:
-        images = pool.imap(_read_image, ((x,) for x in paths), iterable_len=len(paths))
+
+    ctx = mp.get_context(DEFAULT_START_METHOD)
+    with ProcessPoolExecutor(max_workers=num_workers, mp_context=ctx) as pool:
+        images = pool.map(_read_image, paths)
         return get_mean_and_std_from_images(images)
 
 
