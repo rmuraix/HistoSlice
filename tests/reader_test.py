@@ -1,6 +1,5 @@
 import warnings
 
-import numpy as np
 import polars as pl
 import pytest
 from PIL import Image
@@ -10,7 +9,6 @@ from histoslice import SlideReader
 from histoslice._data import SpotCoordinates, TileCoordinates
 
 from ._utils import (
-    DATA_DIRECTORY,
     HAS_PYVIPS_ASSET,
     SLIDE_PATH_JPEG,
     SLIDE_PATH_TIFF,

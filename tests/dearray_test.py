@@ -10,7 +10,8 @@ IMAGE = hp.SlideReader(SLIDE_PATH_TMA).read_level(-1)
 
 
 def test_dearray_good_mask() -> None:
-    __, tissue_mask = F.get_tissue_mask(IMAGE, sigma=2)
+    # Updated sigma for PyVips backend - higher resolution requires more blurring
+    __, tissue_mask = F.get_tissue_mask(IMAGE, sigma=2.5)
     tissue_mask_clean = F.clean_tissue_mask(tissue_mask)
     with warnings.catch_warnings():
         warnings.simplefilter("error")

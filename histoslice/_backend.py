@@ -6,7 +6,6 @@ from typing import (
     Union,
 )
 
-import cv2
 import numpy as np
 
 from histoslice.functional._level import format_level
@@ -146,7 +145,7 @@ class PyVipsBackend(SlideReaderBackend):
         # Open the level-0 page lazily. pyvips is demand-driven, so this does
         # not decode full pixels until needed.
         self.__path = path
-        
+
         # Try to detect if this is a multi-page/pyramidal image
         try:
             self.__img0 = pyvips.Image.new_from_file(path, access="random", page=0)
@@ -301,5 +300,3 @@ class PyVipsBackend(SlideReaderBackend):
         # Pad to the requested (h_l, w_l) shape if we hit the edge.
         tile = _pad_tile(tile, shape=(int(h_l), int(w_l)))
         return tile
-
-

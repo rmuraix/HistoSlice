@@ -21,9 +21,7 @@ from histoslice.functional._tiles import _multiply_xywh
 
 ERROR_WRONG_TYPE = "Expected '{}' to be of type {}, not {}."
 ERROR_NO_THRESHOLD = "Threshold argument is required to save masks/metrics."
-ERROR_AUTOMATIC_BACKEND = (
-    "Could not automatically assign reader for path: '{}'. PyVips backend is used for all supported formats."
-)
+ERROR_AUTOMATIC_BACKEND = "Could not automatically assign reader for path: '{}'. PyVips backend is used for all supported formats."
 ERROR_BACKEND_NAME = "Backend '{}' does not exist. Only PYVIPS backend is supported."
 ERROR_OUTPUT_DIR_IS_FILE = "Output directory exists but it is a file."
 ERROR_CANNOT_OVERWRITE = "Output directory exists, but `overwrite=False`."
