@@ -47,7 +47,7 @@ histoslice slice [OPTIONS]
 |--------|-------|------|---------|-------------|
 | `--input` | `-i` | TEXT | *required* | File pattern to glob (e.g., `'./slides/*.tiff'`). Supports wildcards for batch processing. |
 | `--output` | `-o` | DIRECTORY | *required* | Parent directory for all outputs. Will be created if it doesn't exist. |
-| `--backend` | | TEXT | automatic | Backend for reading slides (`openslide`, `pyvips`, or automatic selection). |
+| `--backend` | | TEXT | automatic | Backend for reading slides (only `pyvips` is supported, or automatic selection). |
 
 ##### Tile Extraction
 
@@ -363,15 +363,13 @@ Found no files matching pattern './slides/*.tiff'.
 
 ### Backend errors
 
-If you encounter errors with the default backend, try specifying one explicitly:
+If you encounter errors, the PyVips backend supports most slide formats:
 
 ```bash
-# Try PyVips
 histoslice slice --input './slides/*.tiff' --output ./tiles --backend pyvips
-
-# Try OpenSlide
-histoslice slice --input './slides/*.tiff' --output ./tiles --backend openslide
 ```
+
+For JPEG or PNG images, PyVips will automatically handle them as single-level images.
 
 ### Memory issues
 
