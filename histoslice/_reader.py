@@ -510,11 +510,11 @@ class SlideReader:
             # Downscale thumbnail if too large to prevent JPEG size limits and reduce disk space
             thumbnail_small = F.downscale_for_thumbnail(thumbnail)
 
-            Image.fromarray(thumbnail_small).save(output_dir / "thumbnail.jpeg")
+            Image.fromarray(thumbnail_small).save(output_dir / "thumbnail.jpg")
             thumbnail_regions = self.get_annotated_thumbnail(
                 thumbnail_small, coordinates
             )
-            thumbnail_regions.save(output_dir / f"thumbnail_{image_dir}.jpeg")
+            thumbnail_regions.save(output_dir / f"thumbnail_{image_dir}.jpg")
             if (
                 isinstance(coordinates, (TileCoordinates, SpotCoordinates))
                 and coordinates.tissue_mask is not None
@@ -536,7 +536,7 @@ class SlideReader:
                     tissue_mask_resized = original_tissue_mask
 
                 Image.fromarray(255 - 255 * tissue_mask_resized).save(
-                    output_dir / "thumbnail_tissue.jpeg"
+                    output_dir / "thumbnail_tissue.jpg"
                 )
         metadata = _save_regions(
             output_dir=output_dir,

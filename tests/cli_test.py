@@ -34,9 +34,9 @@ def test_run(script_runner) -> None:  # noqa
     assert sorted([x.name for x in (TMP_DIRECTORY / "slide").iterdir()]) == sorted(
         [
             "properties.json",
-            "thumbnail.jpeg",
-            "thumbnail_tiles.jpeg",
-            "thumbnail_tissue.jpeg",
+            "thumbnail.jpg",
+            "thumbnail_tiles.jpg",
+            "thumbnail_tissue.jpg",
             "tiles",
             "metadata.parquet",
         ]
@@ -90,9 +90,9 @@ def test_overwrite(script_runner) -> None:  # noqa
     assert sorted([x.name for x in (TMP_DIRECTORY / "slide").iterdir()]) == sorted(
         [
             "properties.json",
-            "thumbnail.jpeg",
-            "thumbnail_tiles.jpeg",
-            "thumbnail_tissue.jpeg",
+            "thumbnail.jpg",
+            "thumbnail_tiles.jpg",
+            "thumbnail_tissue.jpg",
             "tiles",
             "metadata.parquet",
         ]
@@ -123,9 +123,9 @@ def test_unfinished(script_runner) -> None:  # noqa
     assert sorted([x.name for x in (TMP_DIRECTORY / "slide").iterdir()]) == sorted(
         [
             "properties.json",
-            "thumbnail.jpeg",
-            "thumbnail_tiles.jpeg",
-            "thumbnail_tissue.jpeg",
+            "thumbnail.jpg",
+            "thumbnail_tiles.jpg",
+            "thumbnail_tissue.jpg",
             "tiles",
             "metadata.parquet",
         ]

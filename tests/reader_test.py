@@ -255,8 +255,8 @@ def test_save_regions() -> None:
     assert metadata.columns == ["x", "y", "w", "h", "path"]
     assert sorted([f.name for f in (TMP_DIRECTORY / reader.name).iterdir()]) == sorted(
         [
-            "thumbnail.jpeg",
-            "thumbnail_tiles.jpeg",
+            "thumbnail.jpg",
+            "thumbnail_tiles.jpg",
             "tiles",
             "metadata.parquet",
         ]
@@ -287,8 +287,8 @@ def test_save_regions_tiles() -> None:
     assert sorted([f.name for f in (TMP_DIRECTORY / reader.name).iterdir()]) == sorted(
         [
             "properties.json",
-            "thumbnail.jpeg",
-            "thumbnail_tiles.jpeg",
+            "thumbnail.jpg",
+            "thumbnail_tiles.jpg",
             "tiles",
             "metadata.parquet",
         ]
@@ -308,9 +308,9 @@ def test_save_regions_spots() -> None:
     reader.save_regions(TMP_DIRECTORY, spot_coords)
     assert sorted([f.name for f in (TMP_DIRECTORY / reader.name).iterdir()]) == sorted(
         [
-            "thumbnail.jpeg",
-            "thumbnail_spots.jpeg",
-            "thumbnail_tissue.jpeg",
+            "thumbnail.jpg",
+            "thumbnail_spots.jpg",
+            "thumbnail_tissue.jpg",
             "spots",
             "metadata.parquet",
         ]
@@ -361,8 +361,8 @@ def test_save_regions_thumbnail_size_limit() -> None:
     reader.save_regions(TMP_DIRECTORY, regions, save_thumbnails=True)
 
     # Check that thumbnail files exist
-    thumbnail_path = TMP_DIRECTORY / reader.name / "thumbnail.jpeg"
-    thumbnail_tiles_path = TMP_DIRECTORY / reader.name / "thumbnail_tiles.jpeg"
+    thumbnail_path = TMP_DIRECTORY / reader.name / "thumbnail.jpg"
+    thumbnail_tiles_path = TMP_DIRECTORY / reader.name / "thumbnail_tiles.jpg"
     assert thumbnail_path.exists()
     assert thumbnail_tiles_path.exists()
 
