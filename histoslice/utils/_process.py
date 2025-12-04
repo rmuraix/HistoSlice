@@ -54,9 +54,17 @@ class OutlierDetector:
             raise ValueError(ERROR_NO_PATHS)
 
     @classmethod
-    def from_parquet(cls, *args, **kwargs) -> "OutlierDetector":
-        """Wrapper around `polars.read_parquet` function."""
-        return cls(pl.read_parquet(*args, **kwargs))
+    def from_parquet(cls, source, **kwargs) -> "OutlierDetector":
+        """Wrapper around `polars.read_parquet` function.
+
+        Args:
+            source: Path to parquet file(s) or other source accepted by polars.read_parquet.
+            **kwargs: Additional keyword arguments passed to polars.read_parquet.
+
+        Returns:
+            OutlierDetector instance.
+        """
+        return cls(pl.read_parquet(source, **kwargs))
 
     @property
     def dataframe(self) -> pl.DataFrame:
