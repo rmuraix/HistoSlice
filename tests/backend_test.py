@@ -1,27 +1,16 @@
 from __future__ import annotations
 
 import pytest
-from PIL import Image, UnidentifiedImageError
 
-from histoslice._backend import (
-    CziBackend,
-    OpenSlideBackend,
-    PillowBackend,
-    PyVipsBackend,
-)
+from histoslice._backend import PyVipsBackend
 from tests._utils import (
-    SLIDE_PATH_CZI,
     SLIDE_PATH_JPEG,
     SLIDE_PATH_TIFF,
-    HAS_CZI_ASSET,
-    HAS_OPENSLIDE_ASSET,
     HAS_PYVIPS_ASSET,
 )
 
 
-def read_zero_sized_region(
-    backend: CziBackend | OpenSlideBackend | PillowBackend | PyVipsBackend,
-) -> None:
+def read_zero_sized_region(backend: PyVipsBackend) -> None:
     assert backend.read_region((0, 0, 0, 0), 0).shape == (0, 0, 3)
     assert backend.read_region((0, 0, 1, 0), 0).shape == (0, 1, 3)
     if len(backend.level_dimensions) > 1:
@@ -29,7 +18,7 @@ def read_zero_sized_region(
 
 
 def read_region_from_all_levels(
-    backend: CziBackend | OpenSlideBackend | PillowBackend | PyVipsBackend,
+    backend: PyVipsBackend,
     tile_width: int = 256,
 ) -> None:
     for level in backend.level_dimensions:
@@ -41,254 +30,38 @@ def read_region_from_all_levels(
         assert tile_dims == expected_dims
 
 
-def read_invalid_level(
-    backend: CziBackend | OpenSlideBackend | PillowBackend | PyVipsBackend,
-) -> None:
+def read_invalid_level(backend: PyVipsBackend) -> None:
     with pytest.raises(ValueError, match="Level 100 could not be found"):
         backend.read_region((0, 0, 10, 10), level=100)
     with pytest.raises(ValueError, match="Level 100 could not be found"):
         backend.read_region((0, 0, 10, 10), level=100)
 
 
-def test_pillow_backend_properties() -> None:
-    """Test PillowBackend properties."""
-    backend = PillowBackend(SLIDE_PATH_JPEG)
-    assert backend.path == str(SLIDE_PATH_JPEG.resolve())
+def test_pyvips_backend_properties() -> None:
+    """Test PyVipsBackend properties."""
+    if not HAS_PYVIPS_ASSET:
+        pytest.skip("PyVips test data or dependency missing")
+    backend = PyVipsBackend(SLIDE_PATH_TIFF)
+    assert backend.path == str(SLIDE_PATH_TIFF.resolve())
     assert backend.name == "slide"
-    assert backend.suffix == ".jpeg"
+    assert backend.suffix == ".tiff"
     assert backend.reader is not None
 
 
-def test_pillow_backend_invalid_path() -> None:
-    """Test PillowBackend with invalid path."""
+def test_pyvips_backend_invalid_path() -> None:
+    """Test PyVipsBackend with invalid path."""
     from pathlib import Path
 
     with pytest.raises(FileNotFoundError):
-        PillowBackend(Path("/nonexistent/path.jpeg"))
-
-
-def test_pillow_init() -> None:
-    __ = PillowBackend(SLIDE_PATH_JPEG)
-    if not HAS_CZI_ASSET:
-        pytest.skip("CZI test data or dependency missing")
-    with pytest.raises(UnidentifiedImageError):
-        __ = PillowBackend(SLIDE_PATH_CZI)
-
-
-def test_czi_init() -> None:
-    if not HAS_CZI_ASSET:
-        pytest.skip("CZI test data or dependency missing")
-    __ = CziBackend(SLIDE_PATH_CZI)
-    with pytest.raises(RuntimeError):
-        __ = CziBackend(SLIDE_PATH_JPEG)
-
-
-def test_openslide_init() -> None:
-    if not HAS_OPENSLIDE_ASSET:
-        pytest.skip("OpenSlide test data or dependency missing")
-    __ = OpenSlideBackend(SLIDE_PATH_TIFF)
-    # Import error type only when openslide is available
-    from openslide import OpenSlideUnsupportedFormatError
-
-    with pytest.raises(OpenSlideUnsupportedFormatError):
-        __ = OpenSlideBackend(SLIDE_PATH_JPEG)
-
-
-def test_zero_region_pillow() -> None:
-    backend = PillowBackend(SLIDE_PATH_JPEG)
-    read_zero_sized_region(backend)
-
-
-def test_invalid_level_pillow() -> None:
-    backend = PillowBackend(SLIDE_PATH_JPEG)
-    read_invalid_level(backend)
-
-
-def test_read_region_pillow() -> None:
-    backend = PillowBackend(SLIDE_PATH_JPEG)
-    read_region_from_all_levels(backend)
-
-
-def test_read_level_pillow() -> None:
-    backend = PillowBackend(SLIDE_PATH_JPEG)
-    assert backend.read_level(-1).shape == (625, 625, 3)
-
-
-def test_zero_region_czi() -> None:
-    if not HAS_CZI_ASSET:
-        pytest.skip("CZI test data or dependency missing")
-    backend = CziBackend(SLIDE_PATH_CZI)
-    read_zero_sized_region(backend)
-
-
-def test_invalid_level_czi() -> None:
-    if not HAS_CZI_ASSET:
-        pytest.skip("CZI test data or dependency missing")
-    backend = CziBackend(SLIDE_PATH_CZI)
-    read_invalid_level(backend)
-
-
-def test_read_region_czi() -> None:
-    if not HAS_CZI_ASSET:
-        pytest.skip("CZI test data or dependency missing")
-    backend = CziBackend(SLIDE_PATH_CZI)
-    read_region_from_all_levels(backend)
-
-
-def test_read_level_czi() -> None:
-    if not HAS_CZI_ASSET:
-        pytest.skip("CZI test data or dependency missing")
-    backend = CziBackend(SLIDE_PATH_CZI)
-    assert backend.read_level(-1).shape == (1047, 1160, 3)
-
-
-def test_zero_region_openslide() -> None:
-    if not HAS_OPENSLIDE_ASSET:
-        pytest.skip("OpenSlide test data or dependency missing")
-    backend = OpenSlideBackend(SLIDE_PATH_TIFF)
-    read_zero_sized_region(backend)
-
-
-def test_invalid_level_openslide() -> None:
-    if not HAS_OPENSLIDE_ASSET:
-        pytest.skip("OpenSlide test data or dependency missing")
-    backend = OpenSlideBackend(SLIDE_PATH_TIFF)
-    read_invalid_level(backend)
-
-
-def test_read_region_openslide() -> None:
-    if not HAS_OPENSLIDE_ASSET:
-        pytest.skip("OpenSlide test data or dependency missing")
-    backend = OpenSlideBackend(SLIDE_PATH_TIFF)
-    read_region_from_all_levels(backend)
-
-
-def test_read_level_openslide() -> None:
-    if not HAS_OPENSLIDE_ASSET:
-        pytest.skip("OpenSlide test data or dependency missing")
-    backend = OpenSlideBackend(SLIDE_PATH_TIFF)
-    assert backend.read_level(-1).shape == (78, 78, 3)
-
-
-def test_properties_pillow() -> None:
-    backend = PillowBackend(SLIDE_PATH_JPEG)
-    assert backend.path == str(SLIDE_PATH_JPEG)
-    assert backend.name == "slide"
-    assert backend.suffix == ".jpeg"
-    assert backend.BACKEND_NAME == "PILLOW"
-    assert backend.level_count == 3
-    assert backend.dimensions == (2500, 2500)
-    assert backend.level_dimensions == {0: (2500, 2500), 1: (1250, 1250), 2: (625, 625)}
-    assert backend.level_downsamples == {0: (1.0, 1.0), 1: (2.0, 2.0), 2: (4.0, 4.0)}
-    assert backend.data_bounds == (0, 0, 2500, 2500)
-    assert isinstance(backend.reader, Image.Image)
-
-
-def test_properties_czi() -> None:
-    if not HAS_CZI_ASSET:
-        pytest.skip("CZI test data or dependency missing")
-    backend = CziBackend(SLIDE_PATH_CZI)
-    assert backend.path == str(SLIDE_PATH_CZI)
-    assert backend.name == "slide"
-    assert backend.suffix == ".czi"
-    assert backend.BACKEND_NAME == "CZI"
-    assert backend.dimensions == (134009, 148428)
-    assert backend.level_count == 8
-    assert backend.level_dimensions == {
-        0: (134009, 148428),
-        1: (67004, 74214),
-        2: (33502, 37107),
-        3: (16751, 18554),
-        4: (8376, 9277),
-        5: (4188, 4638),
-        6: (2094, 2319),
-        7: (1047, 1160),
-    }
-    assert backend.level_downsamples == {
-        0: (1.0, 1.0),
-        1: (2.0000149244821204, 2.0),
-        2: (4.000029848964241, 4.0),
-        3: (8.000059697928481, 8.00021559855549),
-        4: (16.001074626865673, 16.001293661060803),
-        5: (32.0059708621925, 32.002587322121606),
-        6: (64.02723363592929, 64.00517464424321),
-        7: (128.11567877629062, 128.0655737704918),
-    }
-    assert backend.data_bounds == (0, 0, 148428, 134009)
-    # Import type only when dependency is present
-    from aicspylibczi import CziFile
-
-    assert isinstance(backend.reader, CziFile)
-
-
-@pytest.mark.parametrize(
-    "backend_class,backend_name,has_asset,reader_type",
-    [
-        (
-            OpenSlideBackend,
-            "OPENSLIDE",
-            "HAS_OPENSLIDE_ASSET",
-            "openslide.OpenSlide",
-        ),
-        (PyVipsBackend, "PYVIPS", "HAS_PYVIPS_ASSET", "pyvips.Image"),
-    ],
-)
-def test_tiff_backend_properties(
-    backend_class, backend_name, has_asset, reader_type
-) -> None:
-    """Test properties for backends that read the pyramidal TIFF asset."""
-    # Check if the asset and backend are available
-    if has_asset == "HAS_OPENSLIDE_ASSET" and not HAS_OPENSLIDE_ASSET:
-        pytest.skip("OpenSlide test data or dependency missing")
-    if has_asset == "HAS_PYVIPS_ASSET" and not HAS_PYVIPS_ASSET:
-        pytest.skip("PyVips test data or dependency missing")
-
-    backend = backend_class(SLIDE_PATH_TIFF)
-    assert backend.path == str(SLIDE_PATH_TIFF)
-    assert backend.name == "slide"
-    assert backend.suffix == ".tiff"
-    assert backend.BACKEND_NAME == backend_name
-    assert backend.level_count == 6
-    assert backend.dimensions == (2500, 2500)
-    assert backend.level_dimensions == {
-        0: (2500, 2500),
-        1: (1250, 1250),
-        2: (625, 625),
-        3: (312, 312),
-        4: (156, 156),
-        5: (78, 78),
-    }
-    assert backend.level_downsamples == {
-        0: (1.0, 1.0),
-        1: (2.0, 2.0),
-        2: (4.0, 4.0),
-        3: (8.012820512820513, 8.012820512820513),
-        4: (16.025641025641026, 16.025641025641026),
-        5: (32.05128205128205, 32.05128205128205),
-    }
-    assert backend.data_bounds == (0, 0, 2500, 2500)
-
-    # Check reader type
-    if reader_type == "openslide.OpenSlide":
-        from openslide import OpenSlide
-
-        assert isinstance(backend.reader, OpenSlide)
-    elif reader_type == "pyvips.Image":
-        import pyvips
-
-        assert isinstance(backend.reader, pyvips.Image)
+        PyVipsBackend(Path("/nonexistent/path.tiff"))
 
 
 def test_pyvips_init() -> None:
     if not HAS_PYVIPS_ASSET:
         pytest.skip("PyVips test data or dependency missing")
     __ = PyVipsBackend(SLIDE_PATH_TIFF)
-    # PyVips should raise an error for formats it doesn't support
-    # JPEG without pyramid support should fail
-    import pyvips
-
-    with pytest.raises(pyvips.Error):
-        __ = PyVipsBackend(SLIDE_PATH_JPEG)
+    # PyVips should be able to handle simple JPEG files now
+    __ = PyVipsBackend(SLIDE_PATH_JPEG)
 
 
 def test_zero_region_pyvips() -> None:
@@ -317,3 +90,63 @@ def test_read_level_pyvips() -> None:
         pytest.skip("PyVips test data or dependency missing")
     backend = PyVipsBackend(SLIDE_PATH_TIFF)
     assert backend.read_level(-1).shape == (78, 78, 3)
+
+
+def test_properties_pyvips() -> None:
+    """Test properties for PyVips backend that reads the pyramidal TIFF asset."""
+    if not HAS_PYVIPS_ASSET:
+        pytest.skip("PyVips test data or dependency missing")
+
+    backend = PyVipsBackend(SLIDE_PATH_TIFF)
+    assert backend.path == str(SLIDE_PATH_TIFF)
+    assert backend.name == "slide"
+    assert backend.suffix == ".tiff"
+    assert backend.BACKEND_NAME == "PYVIPS"
+    assert backend.level_count == 6
+    assert backend.dimensions == (2500, 2500)
+    assert backend.level_dimensions == {
+        0: (2500, 2500),
+        1: (1250, 1250),
+        2: (625, 625),
+        3: (312, 312),
+        4: (156, 156),
+        5: (78, 78),
+    }
+    assert backend.level_downsamples == {
+        0: (1.0, 1.0),
+        1: (2.0, 2.0),
+        2: (4.0, 4.0),
+        3: (8.012820512820513, 8.012820512820513),
+        4: (16.025641025641026, 16.025641025641026),
+        5: (32.05128205128205, 32.05128205128205),
+    }
+    assert backend.data_bounds == (0, 0, 2500, 2500)
+
+    # Check reader type
+    import pyvips
+
+    assert isinstance(backend.reader, pyvips.Image)
+
+
+def test_pyvips_jpeg_support() -> None:
+    """Test that PyVips backend can handle non-pyramidal JPEG files."""
+    if not HAS_PYVIPS_ASSET:
+        pytest.skip("PyVips test data or dependency missing")
+
+    backend = PyVipsBackend(SLIDE_PATH_JPEG)
+    assert backend.path == str(SLIDE_PATH_JPEG.resolve())
+    assert backend.name == "slide"
+    assert backend.suffix == ".jpeg"
+    assert backend.BACKEND_NAME == "PYVIPS"
+    assert backend.level_count == 1  # JPEG files have only one level
+    assert backend.dimensions == (2500, 2500)
+    assert backend.level_dimensions == {0: (2500, 2500)}
+    assert backend.level_downsamples == {0: (1.0, 1.0)}
+
+    # Test reading
+    level_data = backend.read_level(0)
+    assert level_data.shape == (2500, 2500, 3)
+
+    # Test region reading
+    region_data = backend.read_region((0, 0, 100, 100), 0)
+    assert region_data.shape == (100, 100, 3)

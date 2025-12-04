@@ -12,7 +12,6 @@ from typing import Any, Optional, Union
 import numpy as np
 from PIL import Image
 
-from histoslice._backend import CziBackend
 from histoslice._reader import SlideReader
 
 try:
@@ -57,19 +56,11 @@ class SlideReaderDataset(Dataset):
         self.coordinates = coordinates
         self.level = level
         self.transform = transform
-        self.__first_sample = True
 
     def __len__(self) -> int:
         return len(self.coordinates)
 
     def __getitem__(self, index: int) -> tuple[Union[np.ndarray, Any], np.ndarray]:
-        if self.__first_sample and isinstance(self.reader._backend, CziBackend):
-            # We have to initialize a new CziFile instance as it does not like
-            # concurrent reads....
-            self.reader = SlideReader(
-                self.reader.path, backend=self.reader.backend_name
-            )
-        self.__first_sample = False
         xywh = self.coordinates[index]
         tile = self.reader.read_region(xywh, level=self.level)
         if self.transform is not None:

@@ -13,12 +13,7 @@ import tqdm
 from PIL import Image
 
 import histoslice.functional as F
-from histoslice._backend import (
-    CziBackend,
-    OpenSlideBackend,
-    PillowBackend,
-    PyVipsBackend,
-)
+from histoslice._backend import PyVipsBackend
 from histoslice._data import SpotCoordinates, TileCoordinates
 from histoslice.functional._concurrent import close_pool, prepare_worker_pool
 from histoslice.functional._level import format_level
@@ -27,13 +22,13 @@ from histoslice.functional._tiles import _multiply_xywh
 ERROR_WRONG_TYPE = "Expected '{}' to be of type {}, not {}."
 ERROR_NO_THRESHOLD = "Threshold argument is required to save masks/metrics."
 ERROR_AUTOMATIC_BACKEND = (
-    "Could not automatically assing reader for path: '{}'. Please choose from {}."
+    "Could not automatically assign reader for path: '{}'. PyVips backend is used for all supported formats."
 )
-ERROR_BACKEND_NAME = "Backend '{}' does not exist, choose from: {}."
+ERROR_BACKEND_NAME = "Backend '{}' does not exist. Only PYVIPS backend is supported."
 ERROR_OUTPUT_DIR_IS_FILE = "Output directory exists but it is a file."
 ERROR_CANNOT_OVERWRITE = "Output directory exists, but `overwrite=False`."
-AVAILABLE_BACKENDS = ("PILLOW", "OPENSLIDE", "CZI")
-OPENSLIDE_READABLE_FORMATS = (
+AVAILABLE_BACKENDS = ("PYVIPS",)
+PYVIPS_READABLE_FORMATS = (
     "svs",
     "vms",
     "vmu",
@@ -44,6 +39,9 @@ OPENSLIDE_READABLE_FORMATS = (
     "svslide",
     "tif",
     "bif",
+    "jpeg",
+    "jpg",
+    "png",
 )
 
 
@@ -615,59 +613,34 @@ class RegionData:
 
 def _read_slide(  # noqa
     path: Union[str, Path], backend: Optional[str] = None
-) -> Union[CziBackend, OpenSlideBackend, PillowBackend, PyVipsBackend]:
-    """Read slide with the requested backend.
+) -> PyVipsBackend:
+    """Read slide with PyVips backend.
 
     Args:
-        backend: Backend to use for reading slide images. If None, attempts to
-            assing the correct backend based on file extension. Defaults to None.
+        backend: Backend to use for reading slide images. Only PYVIPS is supported.
+            If None or "PYVIPS", uses PyVips backend. Defaults to None.
 
     Raises:
         FileNotFoundError: Path does not exist.
-        ValueError: Cannot automatically assign backend for reader.
         ValueError: Backend name not recognised.
 
     Returns:
-        Slide reader backend.
+        PyVips slide reader backend.
     """
     if not isinstance(path, Path):
         path = Path(path)
     if not path.exists():
         raise FileNotFoundError(str(path.resolve()))
     if backend is None:
-        # Based on file-extension.
-        if path.name.endswith(OPENSLIDE_READABLE_FORMATS):
-            try:
-                return OpenSlideBackend(path)
-            except Exception:  # noqa: E501
-                # Fallback to PyVips if OpenSlide fails.
-                return PyVipsBackend(path)
-        if path.name.endswith(("jpeg", "jpg")):
-            return PillowBackend(path)
-        if path.name.endswith("czi"):
-            return CziBackend(path)
-        raise ValueError(ERROR_AUTOMATIC_BACKEND.format(path, AVAILABLE_BACKENDS))
+        # Always use PyVips backend
+        return PyVipsBackend(path)
     if isinstance(backend, str):
         # Based on backend argument.
-        if "PIL" in backend.upper():
-            return PillowBackend(path)
         if "PYVIPS" in backend.upper():
             return PyVipsBackend(path)
-        if "OPEN" in backend.upper():
-            return OpenSlideBackend(path)
-        if "CZI" in backend.upper() or "ZEISS" in backend.upper():
-            return CziBackend(path)
-    if isinstance(
-        backend,
-        (
-            type(CziBackend),
-            type(OpenSlideBackend),
-            type(PillowBackend),
-            type(PyVipsBackend),
-        ),
-    ):
+    if isinstance(backend, type(PyVipsBackend)):
         return backend(path=path)
-    raise ValueError(ERROR_BACKEND_NAME.format(backend, AVAILABLE_BACKENDS))
+    raise ValueError(ERROR_BACKEND_NAME.format(backend))
 
 
 def _read_tile(

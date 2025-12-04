@@ -19,10 +19,9 @@ from histoslice.utils import (
 )
 
 from ._utils import (
-    HAS_CZI_ASSET,
-    HAS_OPENSLIDE_ASSET,
-    SLIDE_PATH_CZI,
+    HAS_PYVIPS_ASSET,
     SLIDE_PATH_JPEG,
+    SLIDE_PATH_TIFF,
     TMP_DIRECTORY,
     clean_temporary_directory,
 )
@@ -48,11 +47,12 @@ def test_reader_dataset_loader_pil() -> None:
     reader = SlideReader(SLIDE_PATH_JPEG)
     __, tissue_mask = reader.get_tissue_mask()
     coords = reader.get_tile_coordinates(tissue_mask, 512, max_background=0.01)
-    dataset = SlideReaderDataset(reader, coords, level=1, transform=lambda z: z)
+    # JPEG files only have one level, so can't use level=1
+    dataset = SlideReaderDataset(reader, coords, level=0, transform=lambda z: z)
     assert isinstance(dataset, Dataset)
     loader = DataLoader(dataset, batch_size=4, num_workers=0, drop_last=True)
     for i, (batch_images, batch_coords) in enumerate(loader):
-        assert batch_images.shape == (4, 256, 256, 3)
+        assert batch_images.shape == (4, 512, 512, 3)
         assert isinstance(batch_images, torch.Tensor)
         assert batch_coords.shape == (4, 4)
         assert isinstance(batch_coords, torch.Tensor)
@@ -60,36 +60,14 @@ def test_reader_dataset_loader_pil() -> None:
             break
 
 
-def test_reader_dataset_loader_openslide() -> None:
+def test_reader_dataset_loader_pyvips() -> None:
     if not HAS_TORCH:
         return pytest.skip("PyTorch is not installed")
-    if not HAS_OPENSLIDE_ASSET:
-        return pytest.skip("OpenSlide test data or dependency missing")
-    reader = SlideReader(SLIDE_PATH_JPEG)
+    if not HAS_PYVIPS_ASSET:
+        return pytest.skip("PyVips test data or dependency missing")
+    reader = SlideReader(SLIDE_PATH_TIFF)
     __, tissue_mask = reader.get_tissue_mask()
     coords = reader.get_tile_coordinates(tissue_mask, 512, max_background=0.01)
-    dataset = SlideReaderDataset(reader, coords, level=1, transform=lambda z: z)
-    assert isinstance(dataset, Dataset)
-    loader = DataLoader(dataset, batch_size=4, num_workers=0, drop_last=True)
-    for i, (batch_images, batch_coords) in enumerate(loader):
-        assert batch_images.shape == (4, 256, 256, 3)
-        assert isinstance(batch_images, torch.Tensor)
-        assert batch_coords.shape == (4, 4)
-        assert isinstance(batch_coords, torch.Tensor)
-        if i > 20:
-            break
-
-
-def test_reader_dataset_loader_czi() -> None:
-    if not HAS_TORCH:
-        return pytest.skip("PyTorch is not installed")
-    if not HAS_CZI_ASSET:
-        return pytest.skip("CZI test data or dependency missing")
-    reader = SlideReader(SLIDE_PATH_CZI)
-    __, tissue_mask = reader.get_tissue_mask()
-    coords = reader.get_tile_coordinates(tissue_mask, 512, max_background=0.01)
-    # CZI fails if multiple workers read data from same instance, which should not
-    # happen here as there is some voodoo shit going on with `Dataset` & `DataLoader`...
     dataset = SlideReaderDataset(reader, coords, level=1, transform=lambda z: z)
     assert isinstance(dataset, Dataset)
     loader = DataLoader(dataset, batch_size=4, num_workers=0, drop_last=True)

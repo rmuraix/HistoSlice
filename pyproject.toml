@@ -25,11 +25,9 @@ classifiers = [
 requires-python = ">=3.10"
 readme = "README.md"
 dependencies = [
-    "aicspylibczi>=3,<4",
     "matplotlib",
     "numpy>=2",
     "opencv-python-headless>=4",
-    "openslide-python>=1.4",
     "pillow>=10",
     "polars>=1.0",
     "scikit-learn>=1,<2",
