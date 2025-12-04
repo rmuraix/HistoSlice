@@ -59,11 +59,29 @@ class OutlierDetector:
 
         Args:
             source: Path to parquet file(s) or other source accepted by polars.read_parquet.
+                Can be a string path, Path object, or glob pattern.
             **kwargs: Additional keyword arguments passed to polars.read_parquet.
 
         Returns:
             OutlierDetector instance.
         """
+        from pathlib import Path
+
+        # Convert source to Path if it's a string
+        if isinstance(source, (str, Path)):
+            source_path = Path(source)
+            # Check if it's a glob pattern (contains wildcards)
+            if "*" in str(source_path) or "?" in str(source_path):
+                # Expand glob pattern to avoid Polars glob issues on Python 3.10/3.11
+                parent = source_path.parent
+                pattern = source_path.name
+                expanded_files = list(parent.glob(pattern))
+                if not expanded_files:
+                    raise FileNotFoundError(
+                        f"No files found matching pattern: {source}"
+                    )
+                source = expanded_files
+
         return cls(pl.read_parquet(source, **kwargs))
 
     @property
