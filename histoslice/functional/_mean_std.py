@@ -2,6 +2,7 @@ import multiprocessing as mp
 from collections.abc import Iterable
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
+import warnings
 from pathlib import Path
 from typing import Union
 
@@ -53,6 +54,11 @@ def get_mean_and_std_from_paths(
             images = pool.map(_read_image, paths)
             return get_mean_and_std_from_images(images)
     except BrokenProcessPool:
+        warnings.warn(
+            "Mean/std multiprocessing pool crashed; falling back to serial execution.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
         # Fall back to serial if the worker pool crashes (e.g. decoder issues).
         return get_mean_and_std_from_images(_read_image(x) for x in paths)
 

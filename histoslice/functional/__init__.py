@@ -12,6 +12,7 @@ __all__ = [
     "get_overlap_area",
     "get_overlap_index",
     "get_random_image_collage",
+    "has_jpeg_support",
     "get_region_from_array",
     "get_spot_coordinates",
     "get_tile_coordinates",
@@ -20,7 +21,7 @@ __all__ = [
 
 from ._dearray import get_spot_coordinates
 from ._draw import get_annotated_image
-from ._images import get_random_image_collage
+from ._images import get_random_image_collage, has_jpeg_support
 from ._mean_std import get_mean_and_std_from_images, get_mean_and_std_from_paths
 from ._metrics import get_image_metrics
 from ._tiles import (

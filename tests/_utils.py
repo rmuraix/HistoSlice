@@ -2,6 +2,7 @@ import shutil
 from pathlib import Path
 
 from histoslice import SlideReader
+from histoslice.functional import has_jpeg_support
 
 DATA_DIRECTORY = Path(__file__).parent / "data"
 TMP_DIRECTORY = DATA_DIRECTORY.parent / "tmp"
@@ -12,6 +13,8 @@ SLIDE_PATH_CZI = DATA_DIRECTORY / "slide.czi"
 SLIDE_PATH_TMA = DATA_DIRECTORY / "tma_spots.jpeg"
 
 IMAGE = SlideReader(SLIDE_PATH_JPEG).read_level(-1)[:500, :500, :]
+
+IMAGE_EXT = "jpeg" if has_jpeg_support() else "png"
 
 
 def clean_temporary_directory() -> None:

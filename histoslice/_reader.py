@@ -13,7 +13,7 @@ import tqdm
 from PIL import Image
 
 import histoslice.functional as F
-from histoslice.functional._images import downscale_to_max_pixels
+from histoslice.functional._images import downscale_to_max_pixels, has_jpeg_support
 from histoslice._backend import PyVipsBackend
 from histoslice._data import SpotCoordinates, TileCoordinates
 from histoslice.functional._concurrent import close_pool, prepare_worker_pool
@@ -440,7 +440,7 @@ class SlideReader:
         num_workers: int = 1,
         raise_exception: bool = True,
         verbose: bool = True,
-    ) -> pl.DataFrame:
+    ) -> tuple[pl.DataFrame, list[dict[str, object]]]:
         """Save regions from an iterable of xywh-coordinates.
 
         Args:
@@ -475,7 +475,7 @@ class SlideReader:
             ValueError: Threshold is not between 0 and 255.
 
         Returns:
-            Polars dataframe with metadata.
+            Tuple of (metadata dataframe, failure reports).
         """
         if (save_metrics or save_masks) and threshold is None:
             raise ValueError(ERROR_NO_THRESHOLD)
@@ -492,6 +492,7 @@ class SlideReader:
                     ),
                     f,
                 )
+        actual_image_format = _resolve_image_format(image_format)
         # Save thumbnails.
         if save_thumbnails:
             if thumbnail_level is None:
@@ -500,15 +501,15 @@ class SlideReader:
 
             # Downscale thumbnail if too large to prevent JPEG size limits and reduce disk space
             thumbnail_small = F.downscale_for_thumbnail(thumbnail)
-            if not _pil_supports_jpeg():
+            if actual_image_format == "png":
                 thumbnail_small = downscale_to_max_pixels(
                     thumbnail_small, max_pixels=300_000
                 )
 
             _save_image(
                 Image.fromarray(thumbnail_small),
-                output_dir / "thumbnail.jpeg",
-                image_format="jpeg",
+                output_dir / f"thumbnail.{actual_image_format}",
+                image_format=actual_image_format,
                 quality=quality,
             )
             thumbnail_regions = self.get_annotated_thumbnail(
@@ -516,8 +517,8 @@ class SlideReader:
             )
             _save_image(
                 thumbnail_regions,
-                output_dir / f"thumbnail_{image_dir}.jpeg",
-                image_format="jpeg",
+                output_dir / f"thumbnail_{image_dir}.{actual_image_format}",
+                image_format=actual_image_format,
                 quality=quality,
             )
             coords_mask = None
@@ -543,11 +544,11 @@ class SlideReader:
 
                 _save_image(
                     Image.fromarray(255 - 255 * tissue_mask_resized),
-                    output_dir / "thumbnail_tissue.jpeg",
-                    image_format="jpeg",
+                    output_dir / f"thumbnail_tissue.{actual_image_format}",
+                    image_format=actual_image_format,
                     quality=quality,
                 )
-        metadata = _save_regions(
+        metadata, failures = _save_regions(
             output_dir=output_dir,
             iterable=self.yield_regions(
                 coordinates=coordinates,
@@ -564,7 +565,7 @@ class SlideReader:
             desc=self.name,
             total=len(coordinates),
             quality=quality,
-            image_format=image_format,
+            image_format=actual_image_format,
             image_dir=image_dir,
             file_prefixes=coordinates.spot_names
             if isinstance(coordinates, SpotCoordinates)
@@ -572,7 +573,9 @@ class SlideReader:
             verbose=verbose,
         )
         metadata.write_parquet(output_dir / "metadata.parquet")
-        return metadata
+        if failures:
+            (output_dir / "failures.json").write_text(json.dumps(failures, indent=2))
+        return metadata, failures
 
     def __repr__(self) -> str:
         return (
@@ -643,30 +646,26 @@ def _save_image(
 ) -> None:
     fmt = image_format.strip().lower()
     if fmt in ("jpg", "jpeg"):
-        if _pil_supports_jpeg():
-            img = image.convert("RGB")
-            arr = np.asarray(img, dtype=np.uint8)
-            if not arr.flags.c_contiguous:
-                arr = np.ascontiguousarray(arr)
-            arr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
-            ok = cv2.imwrite(
-                str(path), arr, [int(cv2.IMWRITE_JPEG_QUALITY), int(quality)]
-            )
-            if ok:
-                return
-        # If JPEG isn't supported (or OpenCV failed), save PNG with .jpeg extension.
-        image.save(path, format="PNG", optimize=True, compress_level=9)
+        img = image.convert("RGB")
+        arr = np.asarray(img, dtype=np.uint8)
+        if not arr.flags.c_contiguous:
+            arr = np.ascontiguousarray(arr)
+        arr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
+        ok = cv2.imwrite(
+            str(path), arr, [int(cv2.IMWRITE_JPEG_QUALITY), int(quality)]
+        )
+        if not ok:
+            raise ValueError(f"Failed to save JPEG image to {path}")
         return
     pil_format = _get_pil_format(image_format)
     image.save(path, format=pil_format)
 
 
-def _pil_supports_jpeg() -> bool:
-    try:
-        exts = Image.registered_extensions()
-    except Exception:
-        return False
-    return exts.get(".jpg") == "JPEG" or exts.get(".jpeg") == "JPEG"
+def _resolve_image_format(image_format: str) -> str:
+    fmt = image_format.strip().lower()
+    if fmt in ("jpg", "jpeg") and not has_jpeg_support():
+        return "png"
+    return fmt
 
 
 def _read_slide(  # noqa
@@ -778,7 +777,7 @@ def _save_regions(
     image_dir: str,
     file_prefixes: list[str],
     verbose: bool,
-) -> pl.DataFrame:
+) -> tuple[pl.DataFrame, list[dict[str, object]]]:
     """Save region data to output directory.
 
     Args:
@@ -793,7 +792,7 @@ def _save_regions(
         verbose: Enable progress bar.
 
     Returns:
-        Polars dataframe with metadata.
+        Tuple of (metadata dataframe, failure reports).
     """
     progress_bar = tqdm.tqdm(
         iterable=iterable,
@@ -802,11 +801,18 @@ def _save_regions(
         total=total,
     )
     rows = []
+    failures: list[dict[str, object]] = []
     num_failed = 0
     for i, (region_data, xywh) in enumerate(progress_bar):
         if isinstance(region_data, Exception):
             num_failed += 1
             progress_bar.set_postfix({"failed": num_failed}, refresh=False)
+            failures.append(
+                {
+                    "xywh": xywh,
+                    "error": repr(region_data),
+                }
+            )
             continue
         rows.append(
             region_data.save_data(
@@ -818,4 +824,4 @@ def _save_regions(
                 prefix=None if file_prefixes is None else file_prefixes[i],
             )
         )
-    return pl.DataFrame(rows)
+    return pl.DataFrame(rows), failures

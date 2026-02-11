@@ -13,6 +13,7 @@ from histoslice._data import SpotCoordinates, TileCoordinates
 from ._utils import (
     DATA_DIRECTORY,
     HAS_PYVIPS_CZI_ASSET,
+    IMAGE_EXT,
     SLIDE_PATH_CZI,
     SLIDE_PATH_JPEG,
     SLIDE_PATH_TIFF,
@@ -251,18 +252,18 @@ def test_save_regions() -> None:
     reader = SlideReader(SLIDE_PATH_JPEG)
     clean_temporary_directory()
     regions = F.get_tile_coordinates(reader.dimensions, 512)
-    metadata = reader.save_regions(TMP_DIRECTORY, regions)
+    metadata, _ = reader.save_regions(TMP_DIRECTORY, regions)
     assert isinstance(metadata, pl.DataFrame)
     assert metadata.columns == ["x", "y", "w", "h", "path"]
     assert sorted([f.name for f in (TMP_DIRECTORY / reader.name).iterdir()]) == sorted(
         [
-            "thumbnail.jpeg",
-            "thumbnail_tiles.jpeg",
+            f"thumbnail.{IMAGE_EXT}",
+            f"thumbnail_tiles.{IMAGE_EXT}",
             "tiles",
             "metadata.parquet",
         ]
     )
-    expected = ["x{}_y{}_w{}_h{}.jpeg".format(*xywh) for xywh in regions]
+    expected = [f"x{xywh[0]}_y{xywh[1]}_w{xywh[2]}_h{xywh[3]}.{IMAGE_EXT}" for xywh in regions]
     assert sorted(
         [f.name for f in (TMP_DIRECTORY / reader.name / "tiles").iterdir()]
     ) == sorted(expected)
@@ -288,13 +289,13 @@ def test_save_regions_tiles() -> None:
     assert sorted([f.name for f in (TMP_DIRECTORY / reader.name).iterdir()]) == sorted(
         [
             "properties.json",
-            "thumbnail.jpeg",
-            "thumbnail_tiles.jpeg",
+            f"thumbnail.{IMAGE_EXT}",
+            f"thumbnail_tiles.{IMAGE_EXT}",
             "tiles",
             "metadata.parquet",
         ]
     )
-    expected = ["x{}_y{}_w{}_h{}.jpeg".format(*xywh) for xywh in tile_coords]
+    expected = [f"x{xywh[0]}_y{xywh[1]}_w{xywh[2]}_h{xywh[3]}.{IMAGE_EXT}" for xywh in tile_coords]
     assert sorted(
         [f.name for f in (TMP_DIRECTORY / reader.name / "tiles").iterdir()]
     ) == sorted(expected)
@@ -309,15 +310,15 @@ def test_save_regions_spots() -> None:
     reader.save_regions(TMP_DIRECTORY, spot_coords)
     assert sorted([f.name for f in (TMP_DIRECTORY / reader.name).iterdir()]) == sorted(
         [
-            "thumbnail.jpeg",
-            "thumbnail_spots.jpeg",
-            "thumbnail_tissue.jpeg",
+            f"thumbnail.{IMAGE_EXT}",
+            f"thumbnail_spots.{IMAGE_EXT}",
+            f"thumbnail_tissue.{IMAGE_EXT}",
             "spots",
             "metadata.parquet",
         ]
     )
     expected = [
-        "{}_x{}_y{}_w{}_h{}.jpeg".format(name, *xywh)
+        f"{name}_x{xywh[0]}_y{xywh[1]}_w{xywh[2]}_h{xywh[3]}.{IMAGE_EXT}"
         for name, xywh in zip(spot_coords.spot_names, spot_coords)
     ]
     assert sorted(
@@ -343,7 +344,7 @@ def test_save_regions_no_thumbnails() -> None:
     reader = SlideReader(SLIDE_PATH_JPEG)
     clean_temporary_directory()
     regions = F.get_tile_coordinates(reader.dimensions, 512)
-    metadata = reader.save_regions(TMP_DIRECTORY, regions, save_thumbnails=False)
+    metadata, _ = reader.save_regions(TMP_DIRECTORY, regions, save_thumbnails=False)
     assert isinstance(metadata, pl.DataFrame)
     assert metadata.columns == ["x", "y", "w", "h", "path"]
     assert sorted([f.name for f in (TMP_DIRECTORY / reader.name).iterdir()]) == sorted(
@@ -362,8 +363,8 @@ def test_save_regions_thumbnail_size_limit() -> None:
     reader.save_regions(TMP_DIRECTORY, regions, save_thumbnails=True)
 
     # Check that thumbnail files exist
-    thumbnail_path = TMP_DIRECTORY / reader.name / "thumbnail.jpeg"
-    thumbnail_tiles_path = TMP_DIRECTORY / reader.name / "thumbnail_tiles.jpeg"
+    thumbnail_path = TMP_DIRECTORY / reader.name / f"thumbnail.{IMAGE_EXT}"
+    thumbnail_tiles_path = TMP_DIRECTORY / reader.name / f"thumbnail_tiles.{IMAGE_EXT}"
     assert thumbnail_path.exists()
     assert thumbnail_tiles_path.exists()
 
@@ -400,7 +401,7 @@ def test_save_regions_with_masks() -> None:
     reader = SlideReader(SLIDE_PATH_JPEG)
     regions = F.get_tile_coordinates(reader.dimensions, 512)
     clean_temporary_directory()
-    metadata = reader.save_regions(
+    metadata, _ = reader.save_regions(
         TMP_DIRECTORY, regions, save_masks=True, threshold=200
     )
     assert "mask_path" in metadata.columns
@@ -415,7 +416,7 @@ def test_save_regions_with_metrics() -> None:
     reader = SlideReader(SLIDE_PATH_JPEG)
     regions = F.get_tile_coordinates(reader.dimensions, 512)
     clean_temporary_directory()
-    metadata = reader.save_regions(
+    metadata, _ = reader.save_regions(
         TMP_DIRECTORY, regions, save_metrics=True, threshold=200
     )
     assert metadata.columns == [

@@ -10,7 +10,7 @@ def test_image_collage() -> None:
     clean_temporary_directory()
     reader = SlideReader(SLIDE_PATH_JPEG)
     tile_coords = reader.get_tile_coordinates(None, width=128)
-    metadata = reader.save_regions(TMP_DIRECTORY, tile_coords)
+    metadata, _ = reader.save_regions(TMP_DIRECTORY, tile_coords)
     collage = F.get_random_image_collage(
         metadata["path"], num_rows=4, num_cols=8, shape=(32, 32)
     )
