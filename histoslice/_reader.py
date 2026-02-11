@@ -13,6 +13,7 @@ import tqdm
 from PIL import Image
 
 import histoslice.functional as F
+from histoslice.functional._images import downscale_to_max_pixels
 from histoslice._backend import PyVipsBackend
 from histoslice._data import SpotCoordinates, TileCoordinates
 from histoslice.functional._concurrent import close_pool, prepare_worker_pool
@@ -428,6 +429,7 @@ class SlideReader:
         *,
         level: int = 0,
         threshold: Optional[int] = None,
+        tissue_mask: Optional[np.ndarray] = None,
         overwrite: bool = False,
         save_metrics: bool = False,
         save_masks: bool = False,
@@ -456,6 +458,8 @@ class SlideReader:
                 set. Defaults to False.
             save_thumbnails: Save slide thumbnail with and without region annotations.
                 Defaults to True.
+            tissue_mask: Optional tissue mask to use for thumbnail visualization.
+                If None and coordinates contains a tissue mask, that mask is used.
             thumbnail_level: Slide pyramid level for thumbnail images. If None, uses the
                 `level_from_max_dimension` method. Ignored when `save_thumbnails=False`.
                 Defaults to None.
@@ -496,22 +500,33 @@ class SlideReader:
 
             # Downscale thumbnail if too large to prevent JPEG size limits and reduce disk space
             thumbnail_small = F.downscale_for_thumbnail(thumbnail)
+            if not _pil_supports_jpeg():
+                thumbnail_small = downscale_to_max_pixels(
+                    thumbnail_small, max_pixels=300_000
+                )
 
-            Image.fromarray(thumbnail_small).save(
-                output_dir / "thumbnail.jpeg", format="JPEG"
+            _save_image(
+                Image.fromarray(thumbnail_small),
+                output_dir / "thumbnail.jpeg",
+                image_format="jpeg",
+                quality=quality,
             )
             thumbnail_regions = self.get_annotated_thumbnail(
                 thumbnail_small, coordinates
             )
-            thumbnail_regions.save(
-                output_dir / f"thumbnail_{image_dir}.jpeg", format="JPEG"
+            _save_image(
+                thumbnail_regions,
+                output_dir / f"thumbnail_{image_dir}.jpeg",
+                image_format="jpeg",
+                quality=quality,
             )
-            if (
-                isinstance(coordinates, (TileCoordinates, SpotCoordinates))
-                and coordinates.tissue_mask is not None
-            ):
+            coords_mask = None
+            if isinstance(coordinates, (TileCoordinates, SpotCoordinates)):
+                coords_mask = coordinates.tissue_mask
+            mask_for_thumbnail = tissue_mask if tissue_mask is not None else coords_mask
+            if mask_for_thumbnail is not None:
                 # For tissue mask, scale it to match the thumbnail dimensions if needed
-                original_tissue_mask = coordinates.tissue_mask
+                original_tissue_mask = mask_for_thumbnail
                 if thumbnail_small.shape[:2] != thumbnail.shape[:2]:
                     # If thumbnail was downscaled, apply the same downscaling to tissue mask
                     scale_h = thumbnail_small.shape[0] / thumbnail.shape[0]
@@ -526,8 +541,11 @@ class SlideReader:
                 else:
                     tissue_mask_resized = original_tissue_mask
 
-                Image.fromarray(255 - 255 * tissue_mask_resized).save(
-                    output_dir / "thumbnail_tissue.jpeg", format="JPEG"
+                _save_image(
+                    Image.fromarray(255 - 255 * tissue_mask_resized),
+                    output_dir / "thumbnail_tissue.jpeg",
+                    image_format="jpeg",
+                    quality=quality,
                 )
         metadata = _save_regions(
             output_dir=output_dir,
@@ -589,15 +607,19 @@ class RegionData:
         # Save image.
         image_path = image_dir / f"{filename}.{image_format}"
         image_path.parent.mkdir(parents=True, exist_ok=True)
-        pil_format = _get_pil_format(image_format)
-        Image.fromarray(self.image).save(image_path, format=pil_format, quality=quality)
+        _save_image(
+            Image.fromarray(self.image),
+            image_path,
+            image_format=image_format,
+            quality=quality,
+        )
         metadata["path"] = str(image_path.resolve())
         # Save mask.
         if self.mask is not None:
             mask_path = mask_dir / f"{filename}.png"
             mask_path.parent.mkdir(parents=True, exist_ok=True)
             Image.fromarray(self.mask).save(mask_path, format="PNG")
-        metadata["mask_path"] = str(mask_path.resolve())
+            metadata["mask_path"] = str(mask_path.resolve())
         return {**metadata, **self.metrics}
 
 
@@ -610,6 +632,41 @@ def _get_pil_format(image_format: str) -> str:
     if fmt in ("tif", "tiff"):
         return "TIFF"
     return fmt.upper()
+
+
+def _save_image(
+    image: Image.Image,
+    path: Path,
+    *,
+    image_format: str,
+    quality: int,
+) -> None:
+    fmt = image_format.strip().lower()
+    if fmt in ("jpg", "jpeg"):
+        if _pil_supports_jpeg():
+            img = image.convert("RGB")
+            arr = np.asarray(img, dtype=np.uint8)
+            if not arr.flags.c_contiguous:
+                arr = np.ascontiguousarray(arr)
+            arr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
+            ok = cv2.imwrite(
+                str(path), arr, [int(cv2.IMWRITE_JPEG_QUALITY), int(quality)]
+            )
+            if ok:
+                return
+        # If JPEG isn't supported (or OpenCV failed), save PNG with .jpeg extension.
+        image.save(path, format="PNG", optimize=True, compress_level=9)
+        return
+    pil_format = _get_pil_format(image_format)
+    image.save(path, format=pil_format)
+
+
+def _pil_supports_jpeg() -> bool:
+    try:
+        exts = Image.registered_extensions()
+    except Exception:
+        return False
+    return exts.get(".jpg") == "JPEG" or exts.get(".jpeg") == "JPEG"
 
 
 def _read_slide(  # noqa
@@ -750,6 +807,7 @@ def _save_regions(
         if isinstance(region_data, Exception):
             num_failed += 1
             progress_bar.set_postfix({"failed": num_failed}, refresh=False)
+            continue
         rows.append(
             region_data.save_data(
                 image_dir=output_dir / image_dir,

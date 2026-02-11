@@ -1,6 +1,7 @@
 import multiprocessing as mp
 from collections.abc import Iterable
 from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 from typing import Union
 
@@ -47,9 +48,13 @@ def get_mean_and_std_from_paths(
         return get_mean_and_std_from_images(_read_image(x) for x in paths)
 
     ctx = mp.get_context(DEFAULT_START_METHOD)
-    with ProcessPoolExecutor(max_workers=num_workers, mp_context=ctx) as pool:
-        images = pool.map(_read_image, paths)
-        return get_mean_and_std_from_images(images)
+    try:
+        with ProcessPoolExecutor(max_workers=num_workers, mp_context=ctx) as pool:
+            images = pool.map(_read_image, paths)
+            return get_mean_and_std_from_images(images)
+    except BrokenProcessPool:
+        # Fall back to serial if the worker pool crashes (e.g. decoder issues).
+        return get_mean_and_std_from_images(_read_image(x) for x in paths)
 
 
 def _get_mean_and_std(image: np.ndarray) -> tuple[MEAN, STD]:
@@ -64,4 +69,7 @@ def _get_mean_and_std(image: np.ndarray) -> tuple[MEAN, STD]:
 
 
 def _read_image(path: Union[str, Path]) -> np.ndarray:
-    return np.array(Image.open(path))
+    img = Image.open(path)
+    if img.mode not in ("RGB", "L"):
+        img = img.convert("RGB")
+    return np.array(img)

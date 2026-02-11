@@ -302,7 +302,12 @@ def cut_slide(
             tissue_kwargs["level"] = reader.level_from_max_dimension(max_dimension)
         threshold, tissue_mask = reader.get_tissue_mask(**tissue_kwargs)
         coords = reader.get_tile_coordinates(tissue_mask=tissue_mask, **tile_kwargs)
-        reader.save_regions(coordinates=coords, threshold=threshold, **save_kwargs)
+        reader.save_regions(
+            coordinates=coords,
+            threshold=threshold,
+            tissue_mask=tissue_mask,
+            **save_kwargs,
+        )
     except Exception as e:  # noqa
         return path, e
     return path, None
