@@ -1,18 +1,13 @@
 import multiprocessing as mp
-import sys
 from collections.abc import Callable, Iterable
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 from pathlib import Path
 from typing import Any, Optional
 
-# Set default start method based on Python version.
-# Python <3.12 has a hang issue when using spawn.
-# In Python 3.12+, fork is deprecated.
-if (sys.version_info[0] == 3) and (sys.version_info[1] >= 12):
-    DEFAULT_START_METHOD = "spawn"
-else:
-    DEFAULT_START_METHOD = "fork"
+# Use spawn to avoid fork-related hangs with libvips/pyvips on Python 3.10/3.11.
+# In Python 3.12+, fork is deprecated anyway.
+DEFAULT_START_METHOD = "spawn"
 
 
 # Global state for worker processes (used instead of MPire's use_worker_state).

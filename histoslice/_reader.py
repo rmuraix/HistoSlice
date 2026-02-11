@@ -13,12 +13,7 @@ import tqdm
 from PIL import Image
 
 import histoslice.functional as F
-from histoslice._backend import (
-    CziBackend,
-    OpenSlideBackend,
-    PillowBackend,
-    PyVipsBackend,
-)
+from histoslice._backend import PyVipsBackend
 from histoslice._data import SpotCoordinates, TileCoordinates
 from histoslice.functional._concurrent import close_pool, prepare_worker_pool
 from histoslice.functional._level import format_level
@@ -32,19 +27,7 @@ ERROR_AUTOMATIC_BACKEND = (
 ERROR_BACKEND_NAME = "Backend '{}' does not exist, choose from: {}."
 ERROR_OUTPUT_DIR_IS_FILE = "Output directory exists but it is a file."
 ERROR_CANNOT_OVERWRITE = "Output directory exists, but `overwrite=False`."
-AVAILABLE_BACKENDS = ("PILLOW", "OPENSLIDE", "CZI")
-OPENSLIDE_READABLE_FORMATS = (
-    "svs",
-    "vms",
-    "vmu",
-    "ndpi",
-    "scn",
-    "mrxs",
-    "tiff",
-    "svslide",
-    "tif",
-    "bif",
-)
+AVAILABLE_BACKENDS = ("PYVIPS",)
 
 
 class SlideReader:
@@ -514,11 +497,15 @@ class SlideReader:
             # Downscale thumbnail if too large to prevent JPEG size limits and reduce disk space
             thumbnail_small = F.downscale_for_thumbnail(thumbnail)
 
-            Image.fromarray(thumbnail_small).save(output_dir / "thumbnail.jpeg")
+            Image.fromarray(thumbnail_small).save(
+                output_dir / "thumbnail.jpeg", format="JPEG"
+            )
             thumbnail_regions = self.get_annotated_thumbnail(
                 thumbnail_small, coordinates
             )
-            thumbnail_regions.save(output_dir / f"thumbnail_{image_dir}.jpeg")
+            thumbnail_regions.save(
+                output_dir / f"thumbnail_{image_dir}.jpeg", format="JPEG"
+            )
             if (
                 isinstance(coordinates, (TileCoordinates, SpotCoordinates))
                 and coordinates.tissue_mask is not None
@@ -540,7 +527,7 @@ class SlideReader:
                     tissue_mask_resized = original_tissue_mask
 
                 Image.fromarray(255 - 255 * tissue_mask_resized).save(
-                    output_dir / "thumbnail_tissue.jpeg"
+                    output_dir / "thumbnail_tissue.jpeg", format="JPEG"
                 )
         metadata = _save_regions(
             output_dir=output_dir,
@@ -602,20 +589,32 @@ class RegionData:
         # Save image.
         image_path = image_dir / f"{filename}.{image_format}"
         image_path.parent.mkdir(parents=True, exist_ok=True)
-        Image.fromarray(self.image).save(image_path, quality=quality)
+        pil_format = _get_pil_format(image_format)
+        Image.fromarray(self.image).save(image_path, format=pil_format, quality=quality)
         metadata["path"] = str(image_path.resolve())
         # Save mask.
         if self.mask is not None:
             mask_path = mask_dir / f"{filename}.png"
             mask_path.parent.mkdir(parents=True, exist_ok=True)
-            Image.fromarray(self.mask).save(mask_path)
-            metadata["mask_path"] = str(mask_path.resolve())
+            Image.fromarray(self.mask).save(mask_path, format="PNG")
+        metadata["mask_path"] = str(mask_path.resolve())
         return {**metadata, **self.metrics}
+
+
+def _get_pil_format(image_format: str) -> str:
+    fmt = image_format.strip().lower()
+    if fmt in ("jpg", "jpeg"):
+        return "JPEG"
+    if fmt == "png":
+        return "PNG"
+    if fmt in ("tif", "tiff"):
+        return "TIFF"
+    return fmt.upper()
 
 
 def _read_slide(  # noqa
     path: Union[str, Path], backend: Optional[str] = None
-) -> Union[CziBackend, OpenSlideBackend, PillowBackend, PyVipsBackend]:
+) -> PyVipsBackend:
     """Read slide with the requested backend.
 
     Args:
@@ -635,36 +634,21 @@ def _read_slide(  # noqa
     if not path.exists():
         raise FileNotFoundError(str(path.resolve()))
     if backend is None:
-        # Based on file-extension.
-        if path.name.endswith(OPENSLIDE_READABLE_FORMATS):
-            try:
-                return OpenSlideBackend(path)
-            except Exception:  # noqa: E501
-                # Fallback to PyVips if OpenSlide fails.
-                return PyVipsBackend(path)
-        if path.name.endswith(("jpeg", "jpg")):
-            return PillowBackend(path)
-        if path.name.endswith("czi"):
-            return CziBackend(path)
-        raise ValueError(ERROR_AUTOMATIC_BACKEND.format(path, AVAILABLE_BACKENDS))
+        try:
+            return PyVipsBackend(path)
+        except Exception as exc:  # pragma: no cover - passthrough
+            raise ValueError(
+                ERROR_AUTOMATIC_BACKEND.format(path, AVAILABLE_BACKENDS)
+            ) from exc
     if isinstance(backend, str):
         # Based on backend argument.
-        if "PIL" in backend.upper():
-            return PillowBackend(path)
-        if "PYVIPS" in backend.upper():
+        if any(
+            key in backend.upper() for key in ("PYVIPS", "OPEN", "CZI", "ZEISS", "PIL")
+        ):
             return PyVipsBackend(path)
-        if "OPEN" in backend.upper():
-            return OpenSlideBackend(path)
-        if "CZI" in backend.upper() or "ZEISS" in backend.upper():
-            return CziBackend(path)
     if isinstance(
         backend,
-        (
-            type(CziBackend),
-            type(OpenSlideBackend),
-            type(PillowBackend),
-            type(PyVipsBackend),
-        ),
+        (type(PyVipsBackend),),
     ):
         return backend(path=path)
     raise ValueError(ERROR_BACKEND_NAME.format(backend, AVAILABLE_BACKENDS))
