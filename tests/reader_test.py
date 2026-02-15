@@ -7,6 +7,7 @@ from PIL import Image
 
 import histoslice.functional as F
 from histoslice import SlideReader
+from histoslice._reader import _save_image
 from histoslice._backend import PyVipsBackend
 from histoslice._data import SpotCoordinates, TileCoordinates
 
@@ -269,6 +270,33 @@ def test_save_regions() -> None:
     assert sorted(
         [f.name for f in (TMP_DIRECTORY / reader.name / "tiles").iterdir()]
     ) == sorted(expected)
+    clean_temporary_directory()
+
+
+def test_save_image_jpeg_conversion() -> None:
+    if not F.has_jpeg_support():
+        return pytest.skip("Pillow lacks JPEG support")
+    clean_temporary_directory()
+    TMP_DIRECTORY.mkdir(parents=True, exist_ok=True)
+    image = Image.fromarray(np.zeros((10, 10), dtype=np.uint8))
+    output_path = TMP_DIRECTORY / "test.jpeg"
+    _save_image(image, output_path, image_format="jpeg", quality=85)
+    assert output_path.exists()
+    saved = Image.open(output_path)
+    assert saved.format == "JPEG"
+    assert saved.mode == "RGB"
+    clean_temporary_directory()
+
+
+def test_save_image_png() -> None:
+    clean_temporary_directory()
+    TMP_DIRECTORY.mkdir(parents=True, exist_ok=True)
+    image = Image.fromarray(np.zeros((10, 10, 3), dtype=np.uint8))
+    output_path = TMP_DIRECTORY / "test.png"
+    _save_image(image, output_path, image_format="png", quality=85)
+    assert output_path.exists()
+    saved = Image.open(output_path)
+    assert saved.format == "PNG"
     clean_temporary_directory()
 
 
