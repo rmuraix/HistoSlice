@@ -645,17 +645,11 @@ def _save_image(
     quality: int,
 ) -> None:
     fmt = image_format.strip().lower()
+    pil_format = _get_pil_format(image_format)
     if fmt in ("jpg", "jpeg"):
         img = image.convert("RGB")
-        arr = np.asarray(img, dtype=np.uint8)
-        if not arr.flags.c_contiguous:
-            arr = np.ascontiguousarray(arr)
-        arr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
-        ok = cv2.imwrite(str(path), arr, [int(cv2.IMWRITE_JPEG_QUALITY), int(quality)])
-        if not ok:
-            raise ValueError(f"Failed to save JPEG image to {path}")
+        img.save(path, format=pil_format, quality=int(quality))
         return
-    pil_format = _get_pil_format(image_format)
     image.save(path, format=pil_format)
 
 
