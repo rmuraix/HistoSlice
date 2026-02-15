@@ -263,7 +263,9 @@ def test_save_regions() -> None:
             "metadata.parquet",
         ]
     )
-    expected = [f"x{xywh[0]}_y{xywh[1]}_w{xywh[2]}_h{xywh[3]}.{IMAGE_EXT}" for xywh in regions]
+    expected = [
+        f"x{xywh[0]}_y{xywh[1]}_w{xywh[2]}_h{xywh[3]}.{IMAGE_EXT}" for xywh in regions
+    ]
     assert sorted(
         [f.name for f in (TMP_DIRECTORY / reader.name / "tiles").iterdir()]
     ) == sorted(expected)
@@ -295,7 +297,10 @@ def test_save_regions_tiles() -> None:
             "metadata.parquet",
         ]
     )
-    expected = [f"x{xywh[0]}_y{xywh[1]}_w{xywh[2]}_h{xywh[3]}.{IMAGE_EXT}" for xywh in tile_coords]
+    expected = [
+        f"x{xywh[0]}_y{xywh[1]}_w{xywh[2]}_h{xywh[3]}.{IMAGE_EXT}"
+        for xywh in tile_coords
+    ]
     assert sorted(
         [f.name for f in (TMP_DIRECTORY / reader.name / "tiles").iterdir()]
     ) == sorted(expected)

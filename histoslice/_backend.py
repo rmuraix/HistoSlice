@@ -241,7 +241,9 @@ class PyVipsBackend(SlideReaderBackend):
             return page
         if page.width >= target_w and page.height >= target_h:
             return page.extract_area(0, 0, target_w, target_h)
-        return page.embed(0, 0, target_w, target_h, extend="white", background=[255, 255, 255])
+        return page.embed(
+            0, 0, target_w, target_h, extend="white", background=[255, 255, 255]
+        )
 
     def _page(self, level: int) -> "pyvips.Image":
         # Helper: fetch a given level/page lazily.

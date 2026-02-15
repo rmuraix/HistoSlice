@@ -32,7 +32,9 @@ def test_posix_paths() -> None:
         return pytest.skip("PyTorch is not installed")
     clean_temporary_directory()
     reader = SlideReader(SLIDE_PATH_JPEG)
-    metadata, _ = reader.save_regions(TMP_DIRECTORY, reader.get_tile_coordinates(None, 96))
+    metadata, _ = reader.save_regions(
+        TMP_DIRECTORY, reader.get_tile_coordinates(None, 96)
+    )
     dataset = TileImageDataset(
         paths=[Path(x) for x in metadata["path"].to_list()],
         labels=metadata[list("xywh")].to_numpy(),
@@ -87,7 +89,9 @@ def test_tile_dataset_loader() -> None:
         return pytest.skip("PyTorch is not installed")
     clean_temporary_directory()
     reader = SlideReader(SLIDE_PATH_JPEG)
-    metadata, _ = reader.save_regions(TMP_DIRECTORY, reader.get_tile_coordinates(None, 96))
+    metadata, _ = reader.save_regions(
+        TMP_DIRECTORY, reader.get_tile_coordinates(None, 96)
+    )
     dataset = TileImageDataset(
         metadata["path"].to_numpy(),
         labels=metadata[list("xywh")].to_numpy(),
@@ -107,7 +111,9 @@ def test_tile_dataset_cache() -> None:
         return pytest.skip("PyTorch is not installed")
     clean_temporary_directory()
     reader = SlideReader(SLIDE_PATH_JPEG)
-    metadata, _ = reader.save_regions(TMP_DIRECTORY, reader.get_tile_coordinates(None, 96))
+    metadata, _ = reader.save_regions(
+        TMP_DIRECTORY, reader.get_tile_coordinates(None, 96)
+    )
     dataset = TileImageDataset(
         metadata["path"].to_numpy(),
         labels=metadata[list("xywh")].to_numpy(),
@@ -132,7 +138,9 @@ def test_tile_dataset_no_labels() -> None:
         return pytest.skip("PyTorch is not installed")
     clean_temporary_directory()
     reader = SlideReader(SLIDE_PATH_JPEG)
-    metadata, _ = reader.save_regions(TMP_DIRECTORY, reader.get_tile_coordinates(None, 96))
+    metadata, _ = reader.save_regions(
+        TMP_DIRECTORY, reader.get_tile_coordinates(None, 96)
+    )
     dataset = TileImageDataset(
         metadata["path"].to_numpy(),
         labels=None,
@@ -149,7 +157,9 @@ def test_tile_dataset_label_length_mismatch() -> None:
         return pytest.skip("PyTorch is not installed")
     clean_temporary_directory()
     reader = SlideReader(SLIDE_PATH_JPEG)
-    metadata, _ = reader.save_regions(TMP_DIRECTORY, reader.get_tile_coordinates(None, 96))
+    metadata, _ = reader.save_regions(
+        TMP_DIRECTORY, reader.get_tile_coordinates(None, 96)
+    )
     paths = metadata["path"].to_numpy()
 
     with pytest.raises(ValueError, match="Path length .* does not match label length"):
@@ -163,7 +173,9 @@ def test_tile_dataset_cache_without_shape() -> None:
         return pytest.skip("PyTorch is not installed")
     clean_temporary_directory()
     reader = SlideReader(SLIDE_PATH_JPEG)
-    metadata, _ = reader.save_regions(TMP_DIRECTORY, reader.get_tile_coordinates(None, 96))
+    metadata, _ = reader.save_regions(
+        TMP_DIRECTORY, reader.get_tile_coordinates(None, 96)
+    )
 
     with pytest.raises(ValueError, match="Tile shape must be defined"):
         TileImageDataset(

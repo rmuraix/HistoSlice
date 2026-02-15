@@ -651,9 +651,7 @@ def _save_image(
         if not arr.flags.c_contiguous:
             arr = np.ascontiguousarray(arr)
         arr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
-        ok = cv2.imwrite(
-            str(path), arr, [int(cv2.IMWRITE_JPEG_QUALITY), int(quality)]
-        )
+        ok = cv2.imwrite(str(path), arr, [int(cv2.IMWRITE_JPEG_QUALITY), int(quality)])
         if not ok:
             raise ValueError(f"Failed to save JPEG image to {path}")
         return
