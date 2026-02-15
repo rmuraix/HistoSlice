@@ -146,6 +146,7 @@ def mock_slide_reader(monkeypatch):
     """Mock the SlideReader class."""
     mock = MagicMock()
     mock.return_value.get_tissue_mask.return_value = (128, MagicMock())
+    mock.return_value.save_regions.return_value = (MagicMock(), [])
     monkeypatch.setattr("histoslice.cli._app.SlideReader", mock)
     return mock
 
