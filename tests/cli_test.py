@@ -1,4 +1,5 @@
 from ._utils import (
+    IMAGE_EXT,
     SLIDE_PATH_JPEG,
     TMP_DIRECTORY,
     clean_temporary_directory,
@@ -34,9 +35,9 @@ def test_run(script_runner) -> None:  # noqa
     assert sorted([x.name for x in (TMP_DIRECTORY / "slide").iterdir()]) == sorted(
         [
             "properties.json",
-            "thumbnail.jpeg",
-            "thumbnail_tiles.jpeg",
-            "thumbnail_tissue.jpeg",
+            f"thumbnail.{IMAGE_EXT}",
+            f"thumbnail_tiles.{IMAGE_EXT}",
+            f"thumbnail_tissue.{IMAGE_EXT}",
             "tiles",
             "metadata.parquet",
         ]
@@ -90,9 +91,9 @@ def test_overwrite(script_runner) -> None:  # noqa
     assert sorted([x.name for x in (TMP_DIRECTORY / "slide").iterdir()]) == sorted(
         [
             "properties.json",
-            "thumbnail.jpeg",
-            "thumbnail_tiles.jpeg",
-            "thumbnail_tissue.jpeg",
+            f"thumbnail.{IMAGE_EXT}",
+            f"thumbnail_tiles.{IMAGE_EXT}",
+            f"thumbnail_tissue.{IMAGE_EXT}",
             "tiles",
             "metadata.parquet",
         ]
@@ -123,9 +124,9 @@ def test_unfinished(script_runner) -> None:  # noqa
     assert sorted([x.name for x in (TMP_DIRECTORY / "slide").iterdir()]) == sorted(
         [
             "properties.json",
-            "thumbnail.jpeg",
-            "thumbnail_tiles.jpeg",
-            "thumbnail_tissue.jpeg",
+            f"thumbnail.{IMAGE_EXT}",
+            f"thumbnail_tiles.{IMAGE_EXT}",
+            f"thumbnail_tissue.{IMAGE_EXT}",
             "tiles",
             "metadata.parquet",
         ]
@@ -217,7 +218,7 @@ def test_clean_command_move(script_runner) -> None:  # noqa
 
     # Count initial tiles
     tiles_dir = TMP_DIRECTORY / "slide" / "tiles"
-    initial_tile_count = len(list(tiles_dir.glob("*.jpeg")))
+    initial_tile_count = len(list(tiles_dir.glob(f"*.{IMAGE_EXT}")))
     assert initial_tile_count > 0
 
     # Run clean command (move mode) with directory pattern
@@ -243,8 +244,8 @@ def test_clean_command_move(script_runner) -> None:  # noqa
     assert outliers_dir.exists()
 
     # Check that some files were moved
-    moved_count = len(list(outliers_dir.glob("*.jpeg")))
-    remaining_count = len(list(tiles_dir.glob("*.jpeg")))
+    moved_count = len(list(outliers_dir.glob(f"*.{IMAGE_EXT}")))
+    remaining_count = len(list(tiles_dir.glob(f"*.{IMAGE_EXT}")))
     assert moved_count > 0
     assert remaining_count + moved_count == initial_tile_count
 
@@ -267,7 +268,7 @@ def test_clean_command_delete(script_runner) -> None:  # noqa
 
     # Count initial tiles
     tiles_dir = TMP_DIRECTORY / "slide" / "tiles"
-    initial_tile_count = len(list(tiles_dir.glob("*.jpeg")))
+    initial_tile_count = len(list(tiles_dir.glob(f"*.{IMAGE_EXT}")))
     assert initial_tile_count > 0
 
     # Run clean command (delete mode)
@@ -290,7 +291,7 @@ def test_clean_command_delete(script_runner) -> None:  # noqa
     assert ret.success
 
     # Check that some files were deleted
-    remaining_count = len(list(tiles_dir.glob("*.jpeg")))
+    remaining_count = len(list(tiles_dir.glob(f"*.{IMAGE_EXT}")))
     assert remaining_count < initial_tile_count
 
     # Check that outliers directory was NOT created
@@ -400,7 +401,7 @@ def test_clean_command_missing_tile_files(script_runner) -> None:  # noqa
 
     # Delete multiple tile files to ensure at least one is an outlier
     tiles_dir = TMP_DIRECTORY / "slide" / "tiles"
-    tile_files = list(tiles_dir.glob("*.jpeg"))
+    tile_files = list(tiles_dir.glob(f"*.{IMAGE_EXT}"))
     if len(tile_files) > 10:
         # Delete the first 10 tile files to increase chance of hitting an outlier
         for i in range(10):

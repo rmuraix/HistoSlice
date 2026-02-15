@@ -13,12 +13,8 @@ import tqdm
 from PIL import Image
 
 import histoslice.functional as F
-from histoslice._backend import (
-    CziBackend,
-    OpenSlideBackend,
-    PillowBackend,
-    PyVipsBackend,
-)
+from histoslice.functional._images import downscale_to_max_pixels, has_jpeg_support
+from histoslice._backend import PyVipsBackend
 from histoslice._data import SpotCoordinates, TileCoordinates
 from histoslice.functional._concurrent import close_pool, prepare_worker_pool
 from histoslice.functional._level import format_level
@@ -32,19 +28,7 @@ ERROR_AUTOMATIC_BACKEND = (
 ERROR_BACKEND_NAME = "Backend '{}' does not exist, choose from: {}."
 ERROR_OUTPUT_DIR_IS_FILE = "Output directory exists but it is a file."
 ERROR_CANNOT_OVERWRITE = "Output directory exists, but `overwrite=False`."
-AVAILABLE_BACKENDS = ("PILLOW", "OPENSLIDE", "CZI")
-OPENSLIDE_READABLE_FORMATS = (
-    "svs",
-    "vms",
-    "vmu",
-    "ndpi",
-    "scn",
-    "mrxs",
-    "tiff",
-    "svslide",
-    "tif",
-    "bif",
-)
+AVAILABLE_BACKENDS = ("PYVIPS",)
 
 
 class SlideReader:
@@ -445,6 +429,7 @@ class SlideReader:
         *,
         level: int = 0,
         threshold: Optional[int] = None,
+        tissue_mask: Optional[np.ndarray] = None,
         overwrite: bool = False,
         save_metrics: bool = False,
         save_masks: bool = False,
@@ -455,7 +440,7 @@ class SlideReader:
         num_workers: int = 1,
         raise_exception: bool = True,
         verbose: bool = True,
-    ) -> pl.DataFrame:
+    ) -> tuple[pl.DataFrame, list[dict[str, object]]]:
         """Save regions from an iterable of xywh-coordinates.
 
         Args:
@@ -473,6 +458,8 @@ class SlideReader:
                 set. Defaults to False.
             save_thumbnails: Save slide thumbnail with and without region annotations.
                 Defaults to True.
+            tissue_mask: Optional tissue mask to use for thumbnail visualization.
+                If None and coordinates contains a tissue mask, that mask is used.
             thumbnail_level: Slide pyramid level for thumbnail images. If None, uses the
                 `level_from_max_dimension` method. Ignored when `save_thumbnails=False`.
                 Defaults to None.
@@ -488,7 +475,7 @@ class SlideReader:
             ValueError: Threshold is not between 0 and 255.
 
         Returns:
-            Polars dataframe with metadata.
+            Tuple of (metadata dataframe, failure reports).
         """
         if (save_metrics or save_masks) and threshold is None:
             raise ValueError(ERROR_NO_THRESHOLD)
@@ -505,6 +492,7 @@ class SlideReader:
                     ),
                     f,
                 )
+        actual_image_format = _resolve_image_format(image_format)
         # Save thumbnails.
         if save_thumbnails:
             if thumbnail_level is None:
@@ -513,18 +501,33 @@ class SlideReader:
 
             # Downscale thumbnail if too large to prevent JPEG size limits and reduce disk space
             thumbnail_small = F.downscale_for_thumbnail(thumbnail)
+            if actual_image_format == "png":
+                thumbnail_small = downscale_to_max_pixels(
+                    thumbnail_small, max_pixels=300_000
+                )
 
-            Image.fromarray(thumbnail_small).save(output_dir / "thumbnail.jpeg")
+            _save_image(
+                Image.fromarray(thumbnail_small),
+                output_dir / f"thumbnail.{actual_image_format}",
+                image_format=actual_image_format,
+                quality=quality,
+            )
             thumbnail_regions = self.get_annotated_thumbnail(
                 thumbnail_small, coordinates
             )
-            thumbnail_regions.save(output_dir / f"thumbnail_{image_dir}.jpeg")
-            if (
-                isinstance(coordinates, (TileCoordinates, SpotCoordinates))
-                and coordinates.tissue_mask is not None
-            ):
+            _save_image(
+                thumbnail_regions,
+                output_dir / f"thumbnail_{image_dir}.{actual_image_format}",
+                image_format=actual_image_format,
+                quality=quality,
+            )
+            coords_mask = None
+            if isinstance(coordinates, (TileCoordinates, SpotCoordinates)):
+                coords_mask = coordinates.tissue_mask
+            mask_for_thumbnail = tissue_mask if tissue_mask is not None else coords_mask
+            if mask_for_thumbnail is not None:
                 # For tissue mask, scale it to match the thumbnail dimensions if needed
-                original_tissue_mask = coordinates.tissue_mask
+                original_tissue_mask = mask_for_thumbnail
                 if thumbnail_small.shape[:2] != thumbnail.shape[:2]:
                     # If thumbnail was downscaled, apply the same downscaling to tissue mask
                     scale_h = thumbnail_small.shape[0] / thumbnail.shape[0]
@@ -539,10 +542,13 @@ class SlideReader:
                 else:
                     tissue_mask_resized = original_tissue_mask
 
-                Image.fromarray(255 - 255 * tissue_mask_resized).save(
-                    output_dir / "thumbnail_tissue.jpeg"
+                _save_image(
+                    Image.fromarray(255 - 255 * tissue_mask_resized),
+                    output_dir / f"thumbnail_tissue.{actual_image_format}",
+                    image_format=actual_image_format,
+                    quality=quality,
                 )
-        metadata = _save_regions(
+        metadata, failures = _save_regions(
             output_dir=output_dir,
             iterable=self.yield_regions(
                 coordinates=coordinates,
@@ -559,7 +565,7 @@ class SlideReader:
             desc=self.name,
             total=len(coordinates),
             quality=quality,
-            image_format=image_format,
+            image_format=actual_image_format,
             image_dir=image_dir,
             file_prefixes=coordinates.spot_names
             if isinstance(coordinates, SpotCoordinates)
@@ -567,7 +573,9 @@ class SlideReader:
             verbose=verbose,
         )
         metadata.write_parquet(output_dir / "metadata.parquet")
-        return metadata
+        if failures:
+            (output_dir / "failures.json").write_text(json.dumps(failures, indent=2))
+        return metadata, failures
 
     def __repr__(self) -> str:
         return (
@@ -602,20 +610,59 @@ class RegionData:
         # Save image.
         image_path = image_dir / f"{filename}.{image_format}"
         image_path.parent.mkdir(parents=True, exist_ok=True)
-        Image.fromarray(self.image).save(image_path, quality=quality)
+        _save_image(
+            Image.fromarray(self.image),
+            image_path,
+            image_format=image_format,
+            quality=quality,
+        )
         metadata["path"] = str(image_path.resolve())
         # Save mask.
         if self.mask is not None:
             mask_path = mask_dir / f"{filename}.png"
             mask_path.parent.mkdir(parents=True, exist_ok=True)
-            Image.fromarray(self.mask).save(mask_path)
+            Image.fromarray(self.mask).save(mask_path, format="PNG")
             metadata["mask_path"] = str(mask_path.resolve())
         return {**metadata, **self.metrics}
 
 
+def _get_pil_format(image_format: str) -> str:
+    fmt = image_format.strip().lower()
+    if fmt in ("jpg", "jpeg"):
+        return "JPEG"
+    if fmt == "png":
+        return "PNG"
+    if fmt in ("tif", "tiff"):
+        return "TIFF"
+    return fmt.upper()
+
+
+def _save_image(
+    image: Image.Image,
+    path: Path,
+    *,
+    image_format: str,
+    quality: int,
+) -> None:
+    fmt = image_format.strip().lower()
+    pil_format = _get_pil_format(image_format)
+    if fmt in ("jpg", "jpeg"):
+        img = image.convert("RGB")
+        img.save(path, format=pil_format, quality=int(quality))
+        return
+    image.save(path, format=pil_format)
+
+
+def _resolve_image_format(image_format: str) -> str:
+    fmt = image_format.strip().lower()
+    if fmt in ("jpg", "jpeg") and not has_jpeg_support():
+        return "png"
+    return fmt
+
+
 def _read_slide(  # noqa
     path: Union[str, Path], backend: Optional[str] = None
-) -> Union[CziBackend, OpenSlideBackend, PillowBackend, PyVipsBackend]:
+) -> PyVipsBackend:
     """Read slide with the requested backend.
 
     Args:
@@ -635,36 +682,21 @@ def _read_slide(  # noqa
     if not path.exists():
         raise FileNotFoundError(str(path.resolve()))
     if backend is None:
-        # Based on file-extension.
-        if path.name.endswith(OPENSLIDE_READABLE_FORMATS):
-            try:
-                return OpenSlideBackend(path)
-            except Exception:  # noqa: E501
-                # Fallback to PyVips if OpenSlide fails.
-                return PyVipsBackend(path)
-        if path.name.endswith(("jpeg", "jpg")):
-            return PillowBackend(path)
-        if path.name.endswith("czi"):
-            return CziBackend(path)
-        raise ValueError(ERROR_AUTOMATIC_BACKEND.format(path, AVAILABLE_BACKENDS))
+        try:
+            return PyVipsBackend(path)
+        except Exception as exc:  # pragma: no cover - passthrough
+            raise ValueError(
+                ERROR_AUTOMATIC_BACKEND.format(path, AVAILABLE_BACKENDS)
+            ) from exc
     if isinstance(backend, str):
         # Based on backend argument.
-        if "PIL" in backend.upper():
-            return PillowBackend(path)
-        if "PYVIPS" in backend.upper():
+        if any(
+            key in backend.upper() for key in ("PYVIPS", "OPEN", "CZI", "ZEISS", "PIL")
+        ):
             return PyVipsBackend(path)
-        if "OPEN" in backend.upper():
-            return OpenSlideBackend(path)
-        if "CZI" in backend.upper() or "ZEISS" in backend.upper():
-            return CziBackend(path)
     if isinstance(
         backend,
-        (
-            type(CziBackend),
-            type(OpenSlideBackend),
-            type(PillowBackend),
-            type(PyVipsBackend),
-        ),
+        (type(PyVipsBackend),),
     ):
         return backend(path=path)
     raise ValueError(ERROR_BACKEND_NAME.format(backend, AVAILABLE_BACKENDS))
@@ -737,7 +769,7 @@ def _save_regions(
     image_dir: str,
     file_prefixes: list[str],
     verbose: bool,
-) -> pl.DataFrame:
+) -> tuple[pl.DataFrame, list[dict[str, object]]]:
     """Save region data to output directory.
 
     Args:
@@ -752,7 +784,7 @@ def _save_regions(
         verbose: Enable progress bar.
 
     Returns:
-        Polars dataframe with metadata.
+        Tuple of (metadata dataframe, failure reports).
     """
     progress_bar = tqdm.tqdm(
         iterable=iterable,
@@ -761,11 +793,19 @@ def _save_regions(
         total=total,
     )
     rows = []
+    failures: list[dict[str, object]] = []
     num_failed = 0
     for i, (region_data, xywh) in enumerate(progress_bar):
         if isinstance(region_data, Exception):
             num_failed += 1
             progress_bar.set_postfix({"failed": num_failed}, refresh=False)
+            failures.append(
+                {
+                    "xywh": xywh,
+                    "error": repr(region_data),
+                }
+            )
+            continue
         rows.append(
             region_data.save_data(
                 image_dir=output_dir / image_dir,
@@ -776,4 +816,4 @@ def _save_regions(
                 prefix=None if file_prefixes is None else file_prefixes[i],
             )
         )
-    return pl.DataFrame(rows)
+    return pl.DataFrame(rows), failures

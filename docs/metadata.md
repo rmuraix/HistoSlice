@@ -1,6 +1,6 @@
 # Metadata Fields
 
-This page documents all metadata fields that HistoSlice collects when processing histological slide images. These fields are saved in the `metadata.parquet` file and can be used for quality control, filtering, and analysis of extracted tiles.
+This page documents all metadata fields that HistoSlice collects when processing histological slide images. These fields are saved in the `metadata.parquet` file and can be used for quality control, filtering, and analysis of extracted tiles. If any tile fails during saving, HistoSlice also writes a `failures.json` file with per-tile error details.
 
 ## Overview
 
@@ -22,12 +22,14 @@ Metadata is collected when you use the `save_metrics=True` option in the CLI or 
     )
     
     # Save with metrics
-    metadata = reader.save_regions(
+    metadata, failures = reader.save_regions(
         "./tiles/",
         tile_coordinates,
         threshold=threshold,
         save_metrics=True,  # Enable metadata collection
     )
+    if failures:
+        print(f"Some tiles failed: {len(failures)}")
     ```
 
 ## Metadata Fields

@@ -88,6 +88,15 @@ def create_image_collage(
     return Image.fromarray(np.vstack(output))
 
 
+def has_jpeg_support() -> bool:
+    """Return True if Pillow has JPEG support enabled."""
+    try:
+        exts = Image.registered_extensions()
+    except Exception:
+        return False
+    return exts.get(".jpg") == "JPEG" or exts.get(".jpeg") == "JPEG"
+
+
 def _read_image(path: Optional[str]) -> np.ndarray:
     """Parallisable."""
     if path is None:

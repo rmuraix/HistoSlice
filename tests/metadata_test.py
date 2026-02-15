@@ -11,7 +11,7 @@ from ._utils import SLIDE_PATH_JPEG, TMP_DIRECTORY, clean_temporary_directory
 def generate_metadata(*, clean_tmp: bool = True, **kwargs) -> pl.DataFrame:
     clean_temporary_directory()
     reader = SlideReader(SLIDE_PATH_JPEG)
-    metadata = reader.save_regions(
+    metadata, _ = reader.save_regions(
         TMP_DIRECTORY,
         reader.get_tile_coordinates(None, 256, overlap=0.0),
         save_metrics=True,

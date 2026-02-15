@@ -1,9 +1,8 @@
 import shutil
 from pathlib import Path
 
-import importlib.util
-
 from histoslice import SlideReader
+from histoslice.functional import has_jpeg_support
 
 DATA_DIRECTORY = Path(__file__).parent / "data"
 TMP_DIRECTORY = DATA_DIRECTORY.parent / "tmp"
@@ -15,6 +14,8 @@ SLIDE_PATH_TMA = DATA_DIRECTORY / "tma_spots.jpeg"
 
 IMAGE = SlideReader(SLIDE_PATH_JPEG).read_level(-1)[:500, :500, :]
 
+IMAGE_EXT = "jpeg" if has_jpeg_support() else "png"
+
 
 def clean_temporary_directory() -> None:
     if TMP_DIRECTORY.exists():
@@ -22,10 +23,13 @@ def clean_temporary_directory() -> None:
 
 
 # Optional dependency flags and asset availability
-HAS_CZI = importlib.util.find_spec("aicspylibczi") is not None
-HAS_OPENSLIDE = importlib.util.find_spec("openslide") is not None
-HAS_PYVIPS = importlib.util.find_spec("pyvips") is not None
+try:
+    import pyvips  # noqa: F401
 
-HAS_CZI_ASSET = HAS_CZI and SLIDE_PATH_CZI.exists()
-HAS_OPENSLIDE_ASSET = HAS_OPENSLIDE and SLIDE_PATH_TIFF.exists()
+    HAS_PYVIPS = True
+except Exception:
+    HAS_PYVIPS = False
+
 HAS_PYVIPS_ASSET = HAS_PYVIPS and SLIDE_PATH_TIFF.exists()
+HAS_PYVIPS_CZI_ASSET = HAS_PYVIPS and SLIDE_PATH_CZI.exists()
+HAS_PYVIPS_JPEG_ASSET = HAS_PYVIPS and SLIDE_PATH_JPEG.exists()
