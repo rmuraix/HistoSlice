@@ -92,9 +92,9 @@ train_tiles
     └── tiles [390 entries exceeds filelimit, not opening dir]
 ```
 
-![Prostate biopsy sample](images/thumbnail.jpeg)
-![Tissue mask](images/thumbnail_tissue.jpeg)
-![Thumbnail with tiles](images/thumbnail_tiles.jpeg)
+![Prostate biopsy sample](https://github.com/rmuraix/HistoSlice/raw/main/images/thumbnail.jpeg)
+![Tissue mask](https://github.com/rmuraix/HistoSlice/raw/main/images/thumbnail_tissue.jpeg)
+![Thumbnail with tiles](https://github.com/rmuraix/HistoSlice/raw/main/images/thumbnail_tiles.jpeg)
 
 As we can see from the above images, histological slide images often contain areas that
 we would not like to include into our training data. Might seem like a daunting task but
@@ -113,6 +113,6 @@ reader.get_annotated_thumbnail(
 )
 ```
 
-![Tiles in cluster 0](images/thumbnail_blue.jpeg)
+![Tiles in cluster 0](https://github.com/rmuraix/HistoSlice/raw/main/images/thumbnail_blue.jpeg)
 
 Now we can mark tiles in cluster `0` as outliers!
