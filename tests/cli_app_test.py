@@ -158,7 +158,7 @@ def test_cut_slide_success(mock_slide_reader):
     tile_kwargs = {"width": 256, "height": 256}
     save_kwargs = {"parent_dir": Path("/tmp")}
 
-    result_path, exception = cut_slide(
+    result_path, exception, failures = cut_slide(
         path,
         reader_kwargs=reader_kwargs,
         max_dimension=512,
@@ -169,6 +169,7 @@ def test_cut_slide_success(mock_slide_reader):
 
     assert result_path == path
     assert exception is None
+    assert failures == 0
     mock_slide_reader.assert_called_once_with(path, **reader_kwargs)
     reader_instance = mock_slide_reader.return_value
     reader_instance.get_tissue_mask.assert_called_once_with(**tissue_kwargs)
@@ -182,7 +183,7 @@ def test_cut_slide_exception(mock_slide_reader):
 
     path = Path("slide.svs")
 
-    result_path, exception = cut_slide(
+    result_path, exception, failures = cut_slide(
         path,
         reader_kwargs={},
         max_dimension=512,
@@ -193,6 +194,7 @@ def test_cut_slide_exception(mock_slide_reader):
 
     assert result_path == path
     assert isinstance(exception, ValueError)
+    assert failures == 0
     assert str(exception) == "Test error"
 
 
@@ -204,7 +206,7 @@ def test_cut_slide_auto_level(mock_slide_reader):
     reader_instance = mock_slide_reader.return_value
     reader_instance.level_from_max_dimension.return_value = 5
 
-    _, exception = cut_slide(
+    _, exception, failures = cut_slide(
         path,
         reader_kwargs={},
         max_dimension=512,
@@ -214,6 +216,7 @@ def test_cut_slide_auto_level(mock_slide_reader):
     )
 
     assert exception is None
+    assert failures == 0
     reader_instance.level_from_max_dimension.assert_called_once_with(512)
     # The modified tissue_kwargs is passed to get_tissue_mask
     assert reader_instance.get_tissue_mask.call_args[1]["level"] == 5

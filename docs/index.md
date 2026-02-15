@@ -101,6 +101,10 @@ tiles
     and update filenames accordingly. Developers can check support via
     `histoslice.functional.has_jpeg_support()`.
 
+!!! note
+    If any tiles fail during extraction, the CLI prints a warning and writes
+    `failures.json` with per-tile error details.
+
 ![Prostate biopsy sample](https://github.com/rmuraix/HistoSlice/blob/main/images/thumbnail.jpeg?raw=true)
 ![Tissue mask](https://github.com/rmuraix/HistoSlice/blob/main/images/thumbnail_tissue.jpeg?raw=true)
 ![Thumbnail with tiles](https://github.com/rmuraix/HistoSlice/blob/main/images/thumbnail_tiles.jpeg?raw=true)

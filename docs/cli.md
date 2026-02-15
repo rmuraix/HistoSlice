@@ -173,6 +173,10 @@ output/
     and update filenames accordingly. Developers can check support via
     `histoslice.functional.has_jpeg_support()`.
 
+!!! note
+    If any tiles fail during extraction, the CLI prints a warning and writes
+    `failures.json` with per-tile error details.
+
 ---
 
 ### `clean` - Remove Outlier Tiles
