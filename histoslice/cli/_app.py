@@ -89,9 +89,14 @@ def cut_slides(
 
     if effective_workers == 0:
         for path in paths:
-            _, exception = cut_slide(path, **kwargs)
+            _, exception, failures = cut_slide(path, **kwargs)
             if isinstance(exception, Exception):
                 warning(f"Could not process {path} due to exception: {exception!r}")
+            elif failures:
+                warning(
+                    f"Slide {path} completed with {failures} failed tile(s). "
+                    "See failures.json for details."
+                )
     else:
         ctx = mp.get_context(DEFAULT_START_METHOD)
         with ProcessPoolExecutor(max_workers=effective_workers, mp_context=ctx) as pool:
@@ -102,9 +107,14 @@ def cut_slides(
             for future in tqdm(
                 as_completed(futures), desc="Cutting slides", total=len(paths)
             ):
-                path, exception = future.result()
+                path, exception, failures = future.result()
                 if isinstance(exception, Exception):
                     warning(f"Could not process {path} due to exception: {exception!r}")
+                elif failures:
+                    warning(
+                        f"Slide {path} completed with {failures} failed tile(s). "
+                        "See failures.json for details."
+                    )
 
 
 @app.command("clean")
@@ -295,22 +305,23 @@ def cut_slide(
     tissue_kwargs: TissueKwargs,
     tile_kwargs: TileKwargs,
     save_kwargs: SaveKwargs,
-) -> tuple[Path, Optional[Exception]]:
+) -> tuple[Path, Optional[Exception], int]:
     try:
         reader = SlideReader(path, **reader_kwargs)
         if tissue_kwargs["level"] is None:
             tissue_kwargs["level"] = reader.level_from_max_dimension(max_dimension)
         threshold, tissue_mask = reader.get_tissue_mask(**tissue_kwargs)
         coords = reader.get_tile_coordinates(tissue_mask=tissue_mask, **tile_kwargs)
-        reader.save_regions(
+        _, failures = reader.save_regions(
             coordinates=coords,
             threshold=threshold,
             tissue_mask=tissue_mask,
             **save_kwargs,
         )
+        failure_count = len(failures)
     except Exception as e:  # noqa
-        return path, e
-    return path, None
+        return path, e, 0
+    return path, None, failure_count
 
 
 def warning(msg: str) -> None:
