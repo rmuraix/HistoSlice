@@ -47,7 +47,7 @@ histoslice slice [OPTIONS]
 |--------|-------|------|---------|-------------|
 | `--input` | `-i` | TEXT | *required* | File pattern to glob (e.g., `'./slides/*.tiff'`). Supports wildcards for batch processing. |
 | `--output` | `-o` | DIRECTORY | *required* | Parent directory for all outputs. Will be created if it doesn't exist. |
-| `--backend` | | TEXT | automatic | Backend for reading slides (`openslide`, `pyvips`, or automatic selection). |
+| `--backend` | | TEXT | automatic | Backend for reading slides (pyvips only; other values are treated as `pyvips` for compatibility). |
 
 ##### Tile Extraction
 
@@ -79,7 +79,7 @@ histoslice slice [OPTIONS]
 | `--thumbnails` | | FLAG | False | Save thumbnail images of the slide with tissue overlay and tile grid. |
 | `--overwrite` | `-z` | FLAG | False | Overwrite any existing slide outputs. |
 | `--unfinished` | `-u` | FLAG | False | Overwrite only if metadata is missing (incomplete previous run). |
-| `--image-format` | | TEXT | jpeg | File format for tile images (e.g., `jpeg`, `png`, `tiff`). |
+| `--image-format` | | TEXT | jpeg | File format for tile images (e.g., `jpeg`, `png`, `tiff`). If JPEG support is unavailable, output will use `png` regardless of this setting. |
 | `--quality` | | INTEGER | 80 | Quality for JPEG compression (0-100). Higher values = better quality but larger files. |
 | `--num-workers` | `-j` | INTEGER | CPU-count | Number of parallel workers for saving tiles. 0 = sequential processing. |
 
@@ -156,16 +156,22 @@ The `slice` command creates the following directory structure:
 output/
 └── slide_name/
     ├── metadata.parquet          # Tile metadata (coordinates, metrics, etc.)
+    ├── failures.json             # Per-tile failures (only written if any failures occur)
     ├── properties.json           # Slide properties
-    ├── thumbnail.jpeg            # Original slide thumbnail (if --thumbnails)
-    ├── thumbnail_tiles.jpeg      # Thumbnail with tile grid (if --thumbnails)
-    ├── thumbnail_tissue.jpeg     # Tissue mask thumbnail (if --thumbnails)
+    ├── thumbnail.jpeg            # Original slide thumbnail (if --thumbnails; .png if JPEG unsupported)
+    ├── thumbnail_tiles.jpeg      # Thumbnail with tile grid (if --thumbnails; .png if JPEG unsupported)
+    ├── thumbnail_tissue.jpeg     # Tissue mask thumbnail (if --thumbnails; .png if JPEG unsupported)
     ├── mask.png                  # Tissue mask (if --masks)
     └── tiles/                    # Directory containing tile images
-        ├── tile_0000.jpeg
+        ├── tile_0000.jpeg        # Uses chosen image format (.png if JPEG unsupported)
         ├── tile_0001.jpeg
         └── ...
 ```
+
+!!! note
+    If Pillow lacks JPEG support in your environment, HistoSlice will write `.png` files
+    and update filenames accordingly. Developers can check support via
+    `histoslice.functional.has_jpeg_support()`.
 
 ---
 
@@ -273,7 +279,7 @@ output/
     ├── metadata.parquet
     ├── properties.json
     ├── tiles/
-    │   ├── tile_0002.jpeg        # Good tiles remain
+    │   ├── tile_0002.jpeg        # Good tiles remain (extension matches output format)
     │   ├── tile_0005.jpeg
     │   └── ...
     └── outliers/                 # Outlier tiles moved here
@@ -368,10 +374,9 @@ If you encounter errors with the default backend, try specifying one explicitly:
 ```bash
 # Try PyVips
 histoslice slice --input './slides/*.tiff' --output ./tiles --backend pyvips
-
-# Try OpenSlide
-histoslice slice --input './slides/*.tiff' --output ./tiles --backend openslide
 ```
+
+OpenSlide is no longer supported. Use pyvips.
 
 ### Memory issues
 

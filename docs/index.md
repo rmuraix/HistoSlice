@@ -68,14 +68,19 @@ Cut each slide image into smaller tile images.
         tissue_mask, width=512, overlap=0.5, max_background=0.5
     )
     # Save tile images with image metrics for preprocessing.
-    tile_metadata = reader.save_regions(
+    tile_metadata, failures = reader.save_regions(
         "./tiles/",
         tile_coordinates,
         threshold=threshold,
         save_metrics=True,
         save_thumbnail=True
     )
+    if failures:
+        print(f"Some tiles failed: {len(failures)}")
     ```
+
+!!! note
+    HistoSlice uses **pyvips** as the only slide backend. The `backend` argument is still accepted for compatibility, but it always resolves to pyvips.
 
 Output directory structure will look like this:
 
@@ -83,12 +88,18 @@ Output directory structure will look like this:
 tiles
 └── slide_id
     ├── metadata.parquet       # tile metadata
+    ├── failures.json          # per-tile failures (only written if any failures occur)
     ├── properties.json        # tile properties
-    ├── thumbnail.jpeg         # thumbnail image
-    ├── thumbnail_tiles.jpeg   # thumbnail with tiles
-    ├── thumbnail_tissue.jpeg  # thumbnail of the tissue mask
+    ├── thumbnail.jpeg         # thumbnail image (or .png if JPEG unsupported)
+    ├── thumbnail_tiles.jpeg   # thumbnail with tiles (or .png if JPEG unsupported)
+    ├── thumbnail_tissue.jpeg  # thumbnail of the tissue mask (or .png if JPEG unsupported)
     └── tiles
 ```
+
+!!! note
+    If Pillow lacks JPEG support in your environment, HistoSlice will write `.png` files
+    and update filenames accordingly. Developers can check support via
+    `histoslice.functional.has_jpeg_support()`.
 
 ![Prostate biopsy sample](https://github.com/rmuraix/HistoSlice/blob/main/images/thumbnail.jpeg?raw=true)
 ![Tissue mask](https://github.com/rmuraix/HistoSlice/blob/main/images/thumbnail_tissue.jpeg?raw=true)

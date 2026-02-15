@@ -37,6 +37,12 @@ pip install histoslice
 
 ## Usage
 
+> [!NOTE]
+> HistoSlice uses **pyvips** as the only slide backend. The `backend` argument is still accepted for compatibility, but it always resolves to pyvips.
+>
+> If Pillow is built without JPEG support, HistoSlice will automatically save tiles/thumbnails as `.png`
+> and update filenames accordingly. Developers can check availability via `histoslice.functional.has_jpeg_support()`.
+
 Typical workflow for training deep learning models with histological images is the
 following:
 
@@ -61,13 +67,15 @@ tile_coordinates = reader.get_tile_coordinates(
     tissue_mask, width=512, overlap=0.5, max_background=0.5
 )
 # Save tile images with image metrics for preprocessing.
-tile_metadata = reader.save_regions(
+tile_metadata, failures = reader.save_regions(
     "./train_tiles/",
     tile_coordinates,
     threshold=threshold,
     save_metrics=True,
     save_thumbnail=True
 )
+if failures:
+    print(f"Some tiles failed: {len(failures)}")
 ```
 
 Let's take a look at the output and visualise the thumbnails.
@@ -76,10 +84,11 @@ Let's take a look at the output and visualise the thumbnails.
 train_tiles
 └── slide_with_ink
     ├── metadata.parquet       # tile metadata
+    ├── failures.json          # per-tile failures (only written if any failures occur)
     ├── properties.json        # tile properties
-    ├── thumbnail.jpeg         # thumbnail image
-    ├── thumbnail_tiles.jpeg   # thumbnail with tiles
-    ├── thumbnail_tissue.jpeg  # thumbnail of the tissue mask
+    ├── thumbnail.jpeg         # thumbnail image (or .png if JPEG support is unavailable)
+    ├── thumbnail_tiles.jpeg   # thumbnail with tiles (or .png if JPEG support is unavailable)
+    ├── thumbnail_tissue.jpeg  # thumbnail of the tissue mask (or .png if JPEG support is unavailable)
     └── tiles [390 entries exceeds filelimit, not opening dir]
 ```
 
