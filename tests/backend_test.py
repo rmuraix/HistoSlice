@@ -196,7 +196,7 @@ def test_pyvips_backend_mpp_resolution_unit_inch() -> None:
     """Test mpp calculation with resolution unit 2 (inches)."""
     if not HAS_PYVIPS_ASSET:
         pytest.skip("PyVips test data or dependency missing")
-    from unittest.mock import MagicMock, PropertyMock
+    from unittest.mock import MagicMock
 
     backend = PyVipsBackend(SLIDE_PATH_TIFF)
 
