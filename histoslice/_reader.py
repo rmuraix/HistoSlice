@@ -263,8 +263,14 @@ class SlideReader:
         """
         # Handle microns parameter
         if microns is not None:
-            if width is not None or height is not None:
-                raise ValueError("Cannot specify both 'microns' and 'width'/'height'.")
+            conflicts = []
+            if width is not None:
+                conflicts.append("'width'")
+            if height is not None:
+                conflicts.append("'height'")
+            if conflicts:
+                conflict_str = " or ".join(conflicts)
+                raise ValueError(f"Cannot specify both 'microns' and {conflict_str}.")
             mpp = self.mpp
             if mpp is None:
                 raise ValueError(

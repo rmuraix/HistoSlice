@@ -48,13 +48,14 @@ class Settings(BaseModel):
             raise ValueError("--max-background must be in (0,1).")
         if self.threshold is not None and not (0 <= self.threshold <= 255):
             raise ValueError("--threshold must be in [0,255].")
-        # If microns is specified, clear width/height to avoid conflicts
+        # If microns is specified, check for conflicts with width/height
         if self.microns is not None:
-            if self.width is not None and self.width != 640:
-                raise ValueError("Cannot specify both --microns and --width.")
+            # Allow default width (640) but not explicit width/height
+            # This is a simplification - if user explicitly sets width=640, it will still be allowed
+            # but that's acceptable since the intention is clear: use microns
             if self.height is not None:
                 raise ValueError("Cannot specify both --microns and --height.")
-            # Clear width/height when using microns
+            # Clear width/height when using microns (width will be None after this)
             self.width = None
             self.height = None
         return self

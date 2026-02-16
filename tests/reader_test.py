@@ -595,6 +595,14 @@ def test_get_tile_coordinates_microns_with_width() -> None:
         reader.get_tile_coordinates(None, width=512, microns=256)
 
 
+def test_get_tile_coordinates_microns_with_height() -> None:
+    """Test that specifying both microns and height raises error."""
+    reader = SlideReader(SLIDE_PATH_JPEG, mpp=(0.5, 0.5))
+
+    with pytest.raises(ValueError, match="Cannot specify both 'microns' and 'height'"):
+        reader.get_tile_coordinates(None, height=512, microns=256)
+
+
 def test_get_tile_coordinates_neither_width_nor_microns() -> None:
     """Test that specifying neither width nor microns raises error."""
     reader = SlideReader(SLIDE_PATH_JPEG)
