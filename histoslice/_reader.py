@@ -38,6 +38,7 @@ class SlideReader:
         self,
         path: Union[str, Path],
         backend: Optional[str] = None,
+        mpp: Optional[tuple[float, float]] = None,
     ) -> None:
         """Initialize `SlideReader` instance.
 
@@ -45,6 +46,8 @@ class SlideReader:
             path: Path to slide image.
             backend: Backend to use for reading slide images. If None, attempts to
                 assing the correct backend based on file extension. Defaults to None.
+            mpp: Override microns per pixel as (mpp_x, mpp_y). If None, attempts to
+                extract from slide metadata. Defaults to None.
 
         Raises:
             FileNotFoundError: Path does not exist.
@@ -53,6 +56,7 @@ class SlideReader:
         """
         super().__init__()
         self._backend = _read_slide(path=path, backend=backend)
+        self._mpp_override = mpp
 
     @property
     def path(self) -> str:
@@ -104,6 +108,17 @@ class SlideReader:
     def level_downsamples(self) -> dict[int, tuple[float, float]]:
         """Image downsample factors (height, width) for each pyramid level."""
         return self._backend.level_downsamples
+
+    @property
+    def mpp(self) -> tuple[float, float] | None:
+        """Microns per pixel (mpp_x, mpp_y) at level 0.
+        
+        Returns user-provided override if available, otherwise extracts from
+        slide metadata. Returns None if not available.
+        """
+        if self._mpp_override is not None:
+            return self._mpp_override
+        return self._backend.mpp
 
     def read_level(self, level: int) -> np.ndarray:
         """Read full pyramid level data.
@@ -210,9 +225,10 @@ class SlideReader:
     def get_tile_coordinates(
         self,
         tissue_mask: Optional[np.ndarray],
-        width: int,
+        width: Optional[int] = None,
         *,
         height: Optional[int] = None,
+        microns: Optional[float] = None,
         overlap: float = 0.0,
         max_background: float = 0.95,
         out_of_bounds: bool = True,
@@ -222,8 +238,12 @@ class SlideReader:
         Args:
             tissue_mask: Tissue mask for filtering tiles with too much background. If
                 None, the filtering is disabled.
-            width: Width of a tile.
-            height: Height of a tile. If None, will be set to `width`. Defaults to None.
+            width: Width of a tile in pixels. Must be specified if `microns` is None.
+            height: Height of a tile in pixels. If None, will be set to `width`. 
+                Defaults to None.
+            microns: Physical size of tiles in microns (µm). If specified, converts to
+                pixels using slide mpp. Cannot be used with `width` or `height`.
+                Defaults to None.
             overlap: Overlap between neighbouring tiles. Defaults to 0.0.
             max_background: Maximum proportion of background in tiles. Ignored if
                 `tissue_mask` is None. Defaults to 0.95.
@@ -231,6 +251,9 @@ class SlideReader:
                 Defaults to True.
 
         Raises:
+            ValueError: Neither `width` nor `microns` specified.
+            ValueError: Both `width` and `microns` specified.
+            ValueError: `microns` specified but mpp not available.
             ValueError: Height and/or width are smaller than 1.
             ValueError: Height and/or width is larger than dimensions.
             ValueError: Overlap is not in range [0, 1).
@@ -238,6 +261,24 @@ class SlideReader:
         Returns:
             `TileCoordinates` dataclass.
         """
+        # Handle microns parameter
+        if microns is not None:
+            if width is not None or height is not None:
+                raise ValueError("Cannot specify both 'microns' and 'width'/'height'.")
+            mpp = self.mpp
+            if mpp is None:
+                raise ValueError(
+                    "Physical size (microns) specified but mpp not available. "
+                    "Provide mpp to SlideReader constructor or use pixel dimensions."
+                )
+            # Convert microns to pixels using mpp (microns / microns_per_pixel)
+            # Use average of mpp_x and mpp_y for square tiles
+            avg_mpp = (mpp[0] + mpp[1]) / 2.0
+            width = int(round(microns / avg_mpp))
+            height = width
+        elif width is None:
+            raise ValueError("Must specify either 'width' or 'microns'.")
+        
         tile_coordinates = F.get_tile_coordinates(
             dimensions=self.dimensions,
             width=width,

@@ -52,7 +52,10 @@ def cut_slides(
     )
 
     kwargs: CutSlideKwargs = {
-        "reader_kwargs": {"backend": cfg.backend},
+        "reader_kwargs": {
+            "backend": cfg.backend,
+            "mpp": (cfg.mpp, cfg.mpp) if cfg.mpp is not None else None,
+        },
         "max_dimension": cfg.max_dimension,
         "tissue_kwargs": {
             "level": cfg.tissue_level,
@@ -63,6 +66,7 @@ def cut_slides(
         "tile_kwargs": {
             "width": cfg.width,
             "height": cfg.height,
+            "microns": cfg.microns,
             "overlap": cfg.overlap,
             "out_of_bounds": not cfg.in_bounds,
             "max_background": cfg.max_background,

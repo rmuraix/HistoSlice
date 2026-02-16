@@ -12,11 +12,13 @@ class Settings(BaseModel):
     paths: List[Path]
     parent_dir: Path
     backend: Optional[str] = None  # None=automatic
+    mpp: Optional[float] = None
 
     # Tile extraction
     level: int = 0
-    width: int = 640
+    width: Optional[int] = 640
     height: Optional[int] = None
+    microns: Optional[float] = None
     overlap: float = 0.0
     max_background: float = 0.75
     in_bounds: bool = False
@@ -46,4 +48,13 @@ class Settings(BaseModel):
             raise ValueError("--max-background must be in (0,1).")
         if self.threshold is not None and not (0 <= self.threshold <= 255):
             raise ValueError("--threshold must be in [0,255].")
+        # If microns is specified, clear width/height to avoid conflicts
+        if self.microns is not None:
+            if self.width is not None and self.width != 640:
+                raise ValueError("Cannot specify both --microns and --width.")
+            if self.height is not None:
+                raise ValueError("Cannot specify both --microns and --height.")
+            # Clear width/height when using microns
+            self.width = None
+            self.height = None
         return self
