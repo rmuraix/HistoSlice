@@ -269,14 +269,15 @@ class SlideReader:
                     "Target mpp specified but slide mpp not available. "
                     "Provide mpp to SlideReader constructor or omit target_mpp."
                 )
-            # Calculate scaling factor: slide_mpp / target_mpp
-            # If slide is 0.5 mpp and target is 0.25 mpp, scale = 2.0 (need higher res)
-            # If slide is 0.25 mpp and target is 0.5 mpp, scale = 0.5 (can use lower res)
+            # Calculate scaling factor: target_mpp / slide_mpp
+            # Physical size = width * target_mpp (e.g., 512px * 0.25mpp = 128µm)
+            # At slide resolution: need (width * target_mpp) / slide_mpp pixels
+            # Example: 512px at 0.25mpp target, slide at 0.5mpp → 256px needed
             avg_slide_mpp = (slide_mpp[0] + slide_mpp[1]) / 2.0
-            scale = avg_slide_mpp / target_mpp
+            scale = target_mpp / avg_slide_mpp
 
             # Scale width/height to extract at native resolution
-            # These will represent the same physical size when downsampled
+            # These will represent the desired physical size
             width = int(round(width * scale))
             if height is not None:
                 height = int(round(height * scale))
