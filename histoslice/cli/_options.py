@@ -81,12 +81,12 @@ def tile_opts(
         ),
     ] = 0,
     width: Annotated[
-        Optional[int],
+        int,
         typer.Option(
             "--width",
             "-w",
             min=0,
-            help="Tile width in pixels. Mutually exclusive with --microns.",
+            help="Tile width in pixels at target resolution.",
             rich_help_panel="Tile extraction",
         ),
     ] = 640,
@@ -97,17 +97,16 @@ def tile_opts(
             "-h",
             min=0,
             show_default="width",
-            help="Tile height in pixels.",
+            help="Tile height in pixels at target resolution.",
             rich_help_panel="Tile extraction",
         ),
     ] = None,
-    microns: Annotated[
+    target_mpp: Annotated[
         Optional[float],
         typer.Option(
-            "--microns",
-            "-m",
+            "--target-mpp",
             min=0.0,
-            help="Tile size in microns (physical units). Requires mpp. Mutually exclusive with --width/--height.",
+            help="Target microns per pixel for normalization. Tiles will be scaled to achieve this resolution.",
             rich_help_panel="Tile extraction",
         ),
     ] = None,
@@ -147,7 +146,7 @@ def tile_opts(
         "level": level,
         "width": width,
         "height": height,
-        "microns": microns,
+        "target_mpp": target_mpp,
         "overlap": overlap,
         "max_background": max_background,
         "in_bounds": in_bounds,
@@ -321,9 +320,9 @@ class TissueKwargs(TypedDict, total=False):
 
 
 class TileKwargs(TypedDict):
-    width: Optional[int]
+    width: int
     height: Optional[int]
-    microns: Optional[float]
+    target_mpp: Optional[float]
     overlap: float
     out_of_bounds: bool
     max_background: float

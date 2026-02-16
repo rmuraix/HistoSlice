@@ -225,10 +225,10 @@ class SlideReader:
     def get_tile_coordinates(
         self,
         tissue_mask: Optional[np.ndarray],
-        width: Optional[int] = None,
+        width: int,
         *,
         height: Optional[int] = None,
-        microns: Optional[float] = None,
+        target_mpp: Optional[float] = None,
         overlap: float = 0.0,
         max_background: float = 0.95,
         out_of_bounds: bool = True,
@@ -238,12 +238,14 @@ class SlideReader:
         Args:
             tissue_mask: Tissue mask for filtering tiles with too much background. If
                 None, the filtering is disabled.
-            width: Width of a tile in pixels. Must be specified if `microns` is None.
-            height: Height of a tile in pixels. If None, will be set to `width`.
-                Defaults to None.
-            microns: Physical size of tiles in microns (µm). If specified, converts to
-                pixels using slide mpp. Cannot be used with `width` or `height`.
-                Defaults to None.
+            width: Width of a tile in pixels at target resolution.
+            height: Height of a tile in pixels at target resolution. If None, will be
+                set to `width`. Defaults to None.
+            target_mpp: Target microns per pixel for normalization. If specified, tiles
+                are extracted at the appropriate level to achieve this resolution. The
+                output tiles will be `width` x `height` pixels representing a physical
+                area of `width * target_mpp` x `height * target_mpp` microns.
+                Defaults to None (use native slide resolution).
             overlap: Overlap between neighbouring tiles. Defaults to 0.0.
             max_background: Maximum proportion of background in tiles. Ignored if
                 `tissue_mask` is None. Defaults to 0.95.
@@ -251,9 +253,7 @@ class SlideReader:
                 Defaults to True.
 
         Raises:
-            ValueError: Neither `width` nor `microns` specified.
-            ValueError: Both `width` and `microns` specified.
-            ValueError: `microns` specified but mpp not available.
+            ValueError: `target_mpp` specified but slide mpp not available.
             ValueError: Height and/or width are smaller than 1.
             ValueError: Height and/or width is larger than dimensions.
             ValueError: Overlap is not in range [0, 1).
@@ -261,29 +261,25 @@ class SlideReader:
         Returns:
             `TileCoordinates` dataclass.
         """
-        # Handle microns parameter
-        if microns is not None:
-            conflicts = []
-            if width is not None:
-                conflicts.append("'width'")
-            if height is not None:
-                conflicts.append("'height'")
-            if conflicts:
-                conflict_str = " or ".join(conflicts)
-                raise ValueError(f"Cannot specify both 'microns' and {conflict_str}.")
-            mpp = self.mpp
-            if mpp is None:
+        # Handle target_mpp parameter for resolution normalization
+        if target_mpp is not None:
+            slide_mpp = self.mpp
+            if slide_mpp is None:
                 raise ValueError(
-                    "Physical size (microns) specified but mpp not available. "
-                    "Provide mpp to SlideReader constructor or use pixel dimensions."
+                    "Target mpp specified but slide mpp not available. "
+                    "Provide mpp to SlideReader constructor or omit target_mpp."
                 )
-            # Convert microns to pixels using mpp (microns / microns_per_pixel)
-            # Use average of mpp_x and mpp_y for square tiles
-            avg_mpp = (mpp[0] + mpp[1]) / 2.0
-            width = int(round(microns / avg_mpp))
-            height = width
-        elif width is None:
-            raise ValueError("Must specify either 'width' or 'microns'.")
+            # Calculate scaling factor: slide_mpp / target_mpp
+            # If slide is 0.5 mpp and target is 0.25 mpp, scale = 2.0 (need higher res)
+            # If slide is 0.25 mpp and target is 0.5 mpp, scale = 0.5 (can use lower res)
+            avg_slide_mpp = (slide_mpp[0] + slide_mpp[1]) / 2.0
+            scale = avg_slide_mpp / target_mpp
+
+            # Scale width/height to extract at native resolution
+            # These will represent the same physical size when downsampled
+            width = int(round(width * scale))
+            if height is not None:
+                height = int(round(height * scale))
 
         tile_coordinates = F.get_tile_coordinates(
             dimensions=self.dimensions,

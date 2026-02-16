@@ -79,17 +79,19 @@ Cut each slide image into smaller tile images.
         print(f"Some tiles failed: {len(failures)}")
     ```
 
-### Physical Scale Support
+### Physical Scale Normalization
 
-HistoSlice supports specifying tile sizes in physical units (microns) instead of pixels. This ensures consistent tile sizes across slides scanned at different resolutions.
+HistoSlice supports normalizing slides to a consistent physical resolution using `target_mpp`. This ensures both consistent physical scale AND consistent tensor dimensions for deep learning pipelines.
 
 === "CLI"
     ```bash
-    # Specify tile size in microns (physical units)
+    # Normalize to 0.5 mpp with 512x512 pixel tiles
+    # All slides will produce 512x512 tiles representing the same physical area
     histoslice \
         --input './images/*.tiff' \
         --output ./tiles \
-        --microns 256 \
+        --width 512 \
+        --target-mpp 0.5 \
         --overlap 0.5 \
         --max-background 0.5
     
@@ -98,7 +100,8 @@ HistoSlice supports specifying tile sizes in physical units (microns) instead of
         --input './images/*.tiff' \
         --output ./tiles \
         --mpp 0.5 \
-        --microns 256
+        --width 512 \
+        --target-mpp 0.25
     ```
 === "Python API"
     ```python
@@ -111,15 +114,29 @@ HistoSlice supports specifying tile sizes in physical units (microns) instead of
     # Override mpp if needed
     reader = SlideReader("./path/to/slide.tiff", mpp=(0.5, 0.5))
     
-    # Specify tile size in microns
+    # Normalize to target resolution - always get 512x512 pixel tiles
     threshold, tissue_mask = reader.get_tissue_mask(level=-1)
     tile_coordinates = reader.get_tile_coordinates(
         tissue_mask, 
-        microns=256,  # 256 microns - automatically converted to pixels
+        width=512,       # Output tile size in pixels
+        target_mpp=0.5,  # Target resolution (512px * 0.5mpp = 256µm physical size)
         overlap=0.5, 
         max_background=0.5
     )
+    # Result: 512x512 pixel tiles representing 256x256 µm physical area
     ```
+
+!!! info "Resolution Normalization"
+    When `target_mpp` is specified:
+    
+    - Tiles are extracted at the appropriate resolution to achieve the target mpp
+    - Output tiles are always `width` x `height` pixels (consistent tensor dimensions)
+    - Each tile represents `width * target_mpp` x `height * target_mpp` microns
+    - Example: 512px tiles at 0.5 mpp = 256µm x 256µm physical area
+    
+    This is ideal for deep learning where you need:
+    - **Consistent physical scale** across slides (same biological structures)
+    - **Consistent tensor shape** for neural networks (e.g., always 512x512)
 
 !!! info "MPP Extraction"
     HistoSlice automatically extracts microns-per-pixel (mpp) from slide metadata when available. It supports:

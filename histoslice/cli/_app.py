@@ -66,7 +66,7 @@ def cut_slides(
         "tile_kwargs": {
             "width": cfg.width,
             "height": cfg.height,
-            "microns": cfg.microns,
+            "target_mpp": cfg.target_mpp,
             "overlap": cfg.overlap,
             "out_of_bounds": not cfg.in_bounds,
             "max_background": cfg.max_background,

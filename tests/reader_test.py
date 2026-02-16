@@ -558,21 +558,40 @@ def test_reader_mpp_square_override() -> None:
     assert reader.mpp == (0.5, 0.5)
 
 
-def test_get_tile_coordinates_with_microns() -> None:
-    """Test tile coordinate generation with microns parameter."""
+def test_get_tile_coordinates_with_target_mpp() -> None:
+    """Test tile coordinate generation with target_mpp parameter for normalization."""
+    # Slide with 0.5 mpp, target 0.25 mpp
+    # Scale factor = 0.5 / 0.25 = 2.0
+    # 512 pixels at target -> 1024 pixels at native resolution
     reader = SlideReader(SLIDE_PATH_JPEG, mpp=(0.5, 0.5))
     threshold, tissue_mask = reader.get_tissue_mask(level=-1)
 
-    # Test with 256 microns - should give 512 pixels at 0.5 mpp
     tile_coords = reader.get_tile_coordinates(
-        tissue_mask, microns=256, overlap=0.5, max_background=0.5
+        tissue_mask, width=512, target_mpp=0.25, overlap=0.5, max_background=0.5
     )
-    assert tile_coords.width == 512
-    assert tile_coords.height == 512
+    # Tiles extracted at 1024 pixels to represent 512 pixels at 0.25 mpp
+    assert tile_coords.width == 1024
+    assert tile_coords.height == 1024
 
 
-def test_get_tile_coordinates_microns_no_mpp() -> None:
-    """Test that microns parameter raises error when mpp not available."""
+def test_get_tile_coordinates_target_mpp_downscale() -> None:
+    """Test target_mpp with downscaling (target > slide mpp)."""
+    # Slide with 0.25 mpp, target 0.5 mpp
+    # Scale factor = 0.25 / 0.5 = 0.5
+    # 512 pixels at target -> 256 pixels at native resolution
+    reader = SlideReader(SLIDE_PATH_JPEG, mpp=(0.25, 0.25))
+    threshold, tissue_mask = reader.get_tissue_mask(level=-1)
+
+    tile_coords = reader.get_tile_coordinates(
+        tissue_mask, width=512, target_mpp=0.5, overlap=0.5, max_background=0.5
+    )
+    # Tiles extracted at 256 pixels to represent 512 pixels at 0.5 mpp
+    assert tile_coords.width == 256
+    assert tile_coords.height == 256
+
+
+def test_get_tile_coordinates_target_mpp_no_mpp() -> None:
+    """Test that target_mpp raises error when slide mpp not available."""
     from unittest.mock import PropertyMock, patch
 
     reader = SlideReader(SLIDE_PATH_JPEG)
@@ -582,30 +601,6 @@ def test_get_tile_coordinates_microns_no_mpp() -> None:
         type(reader), "mpp", new_callable=PropertyMock, return_value=None
     ):
         with pytest.raises(
-            ValueError, match="Physical size.*specified but mpp not available"
+            ValueError, match="Target mpp specified but slide mpp not available"
         ):
-            reader.get_tile_coordinates(None, microns=256)
-
-
-def test_get_tile_coordinates_microns_with_width() -> None:
-    """Test that specifying both microns and width raises error."""
-    reader = SlideReader(SLIDE_PATH_JPEG, mpp=(0.5, 0.5))
-
-    with pytest.raises(ValueError, match="Cannot specify both 'microns' and 'width'"):
-        reader.get_tile_coordinates(None, width=512, microns=256)
-
-
-def test_get_tile_coordinates_microns_with_height() -> None:
-    """Test that specifying both microns and height raises error."""
-    reader = SlideReader(SLIDE_PATH_JPEG, mpp=(0.5, 0.5))
-
-    with pytest.raises(ValueError, match="Cannot specify both 'microns' and 'height'"):
-        reader.get_tile_coordinates(None, height=512, microns=256)
-
-
-def test_get_tile_coordinates_neither_width_nor_microns() -> None:
-    """Test that specifying neither width nor microns raises error."""
-    reader = SlideReader(SLIDE_PATH_JPEG)
-
-    with pytest.raises(ValueError, match="Must specify either 'width' or 'microns'"):
-        reader.get_tile_coordinates(None)
+            reader.get_tile_coordinates(None, width=512, target_mpp=0.25)
