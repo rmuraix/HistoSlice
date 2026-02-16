@@ -606,3 +606,23 @@ def test_get_tile_coordinates_target_mpp_no_mpp() -> None:
             ValueError, match="Target mpp specified but slide mpp not available"
         ):
             reader.get_tile_coordinates(None, width=512, target_mpp=0.25)
+
+
+def test_get_tile_coordinates_target_mpp_with_height() -> None:
+    """Test target_mpp with explicit height parameter."""
+    # Test that both width and height are scaled when height is specified
+    reader = SlideReader(SLIDE_PATH_JPEG, mpp=(0.5, 0.5))
+    threshold, tissue_mask = reader.get_tissue_mask(level=-1)
+
+    tile_coords = reader.get_tile_coordinates(
+        tissue_mask,
+        width=512,
+        height=256,
+        target_mpp=0.25,
+        overlap=0.5,
+        max_background=0.5,
+    )
+    # Scale factor = 0.25 / 0.5 = 0.5
+    # Width: 512 * 0.5 = 256px, Height: 256 * 0.5 = 128px
+    assert tile_coords.width == 256
+    assert tile_coords.height == 128

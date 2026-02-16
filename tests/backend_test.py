@@ -190,3 +190,127 @@ def test_pyvips_backend_mpp_tiff() -> None:
         assert len(mpp) == 2
         assert mpp[0] > 0
         assert mpp[1] > 0
+
+
+def test_pyvips_backend_mpp_resolution_unit_inch() -> None:
+    """Test mpp calculation with resolution unit 2 (inches)."""
+    if not HAS_PYVIPS_ASSET:
+        pytest.skip("PyVips test data or dependency missing")
+    from unittest.mock import MagicMock, PropertyMock
+
+    backend = PyVipsBackend(SLIDE_PATH_TIFF)
+
+    # Mock the image to return resolution in inches
+    # 1000 pixels per inch = 25400 / 1000 = 25.4 µm/pixel
+    mock_img = MagicMock()
+    mock_img.get = MagicMock(
+        side_effect=lambda key: {
+            "openslide.mpp-x": Exception("Not available"),
+            "xres": 1000.0,
+            "yres": 1000.0,
+            "resolution-unit": 2,  # inches
+        }.get(key, Exception("Not available"))
+    )
+
+    # Replace the internal image
+    backend._PyVipsBackend__img0 = mock_img
+
+    mpp = backend.mpp
+    assert mpp is not None
+    assert abs(mpp[0] - 25.4) < 0.01
+    assert abs(mpp[1] - 25.4) < 0.01
+
+
+def test_pyvips_backend_mpp_resolution_unit_cm() -> None:
+    """Test mpp calculation with resolution unit 3 (cm)."""
+    if not HAS_PYVIPS_ASSET:
+        pytest.skip("PyVips test data or dependency missing")
+    from unittest.mock import MagicMock
+
+    backend = PyVipsBackend(SLIDE_PATH_TIFF)
+
+    # Mock the image to return resolution in cm
+    # 100 pixels per cm = 10000 / 100 = 100 µm/pixel
+    mock_img = MagicMock()
+    mock_img.get = MagicMock(
+        side_effect=lambda key: {
+            "openslide.mpp-x": Exception("Not available"),
+            "xres": 100.0,
+            "yres": 100.0,
+            "resolution-unit": 3,  # cm
+        }.get(key, Exception("Not available"))
+    )
+
+    # Replace the internal image
+    backend._PyVipsBackend__img0 = mock_img
+
+    mpp = backend.mpp
+    assert mpp is not None
+    assert abs(mpp[0] - 100.0) < 0.01
+    assert abs(mpp[1] - 100.0) < 0.01
+
+
+def test_pyvips_backend_mpp_invalid_resolution_unit() -> None:
+    """Test mpp returns None with invalid resolution unit."""
+    if not HAS_PYVIPS_ASSET:
+        pytest.skip("PyVips test data or dependency missing")
+    from unittest.mock import MagicMock
+
+    backend = PyVipsBackend(SLIDE_PATH_TIFF)
+
+    # Mock the image with invalid unit
+    mock_img = MagicMock()
+    mock_img.get = MagicMock(
+        side_effect=lambda key: {
+            "openslide.mpp-x": Exception("Not available"),
+            "xres": 100.0,
+            "yres": 100.0,
+            "resolution-unit": 99,  # invalid unit
+        }.get(key, Exception("Not available"))
+    )
+
+    # Replace the internal image
+    backend._PyVipsBackend__img0 = mock_img
+
+    mpp = backend.mpp
+    assert mpp is None
+
+
+def test_pyvips_backend_mpp_zero_resolution() -> None:
+    """Test mpp returns None when resolution is zero or negative."""
+    if not HAS_PYVIPS_ASSET:
+        pytest.skip("PyVips test data or dependency missing")
+    from unittest.mock import MagicMock
+
+    backend = PyVipsBackend(SLIDE_PATH_TIFF)
+
+    # Mock the image with zero xres
+    mock_img = MagicMock()
+    mock_img.get = MagicMock(
+        side_effect=lambda key: {
+            "openslide.mpp-x": Exception("Not available"),
+            "xres": 0.0,
+            "yres": 100.0,
+            "resolution-unit": None,
+        }.get(key, Exception("Not available"))
+    )
+
+    # Replace the internal image
+    backend._PyVipsBackend__img0 = mock_img
+
+    mpp = backend.mpp
+    assert mpp is None
+
+    # Test with negative yres
+    mock_img.get = MagicMock(
+        side_effect=lambda key: {
+            "openslide.mpp-x": Exception("Not available"),
+            "xres": 100.0,
+            "yres": -10.0,
+            "resolution-unit": None,
+        }.get(key, Exception("Not available"))
+    )
+
+    backend._PyVipsBackend__img0 = mock_img
+    mpp = backend.mpp
+    assert mpp is None
