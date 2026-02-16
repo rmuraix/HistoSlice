@@ -79,6 +79,57 @@ Cut each slide image into smaller tile images.
         print(f"Some tiles failed: {len(failures)}")
     ```
 
+### Physical Scale Support
+
+HistoSlice supports specifying tile sizes in physical units (microns) instead of pixels. This ensures consistent tile sizes across slides scanned at different resolutions.
+
+=== "CLI"
+    ```bash
+    # Specify tile size in microns (physical units)
+    histoslice \
+        --input './images/*.tiff' \
+        --output ./tiles \
+        --microns 256 \
+        --overlap 0.5 \
+        --max-background 0.5
+    
+    # Override slide mpp if metadata is missing or incorrect
+    histoslice \
+        --input './images/*.tiff' \
+        --output ./tiles \
+        --mpp 0.5 \
+        --microns 256
+    ```
+=== "Python API"
+    ```python
+    from histoslice import SlideReader
+    
+    # Read slide image - mpp extracted from metadata
+    reader = SlideReader("./path/to/slide.tiff")
+    print(f"Slide mpp: {reader.mpp}")  # e.g., (0.25, 0.25)
+    
+    # Override mpp if needed
+    reader = SlideReader("./path/to/slide.tiff", mpp=(0.5, 0.5))
+    
+    # Specify tile size in microns
+    threshold, tissue_mask = reader.get_tissue_mask(level=-1)
+    tile_coordinates = reader.get_tile_coordinates(
+        tissue_mask, 
+        microns=256,  # 256 microns - automatically converted to pixels
+        overlap=0.5, 
+        max_background=0.5
+    )
+    ```
+
+!!! info "MPP Extraction"
+    HistoSlice automatically extracts microns-per-pixel (mpp) from slide metadata when available. It supports:
+    
+    - OpenSlide properties (`openslide.mpp-x`, `openslide.mpp-y`)
+    - TIFF resolution tags with unit conversion
+    - Generic resolution metadata (xres, yres)
+    
+    If your slides don't have mpp metadata, you can provide it manually using the `--mpp` CLI option or `mpp` parameter in the Python API.
+
 !!! note
     HistoSlice uses **pyvips** as the only slide backend. The `backend` argument is still accepted for compatibility, but it always resolves to pyvips.
 

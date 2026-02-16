@@ -48,14 +48,16 @@ histoslice slice [OPTIONS]
 | `--input` | `-i` | TEXT | *required* | File pattern to glob (e.g., `'./slides/*.tiff'`). Supports wildcards for batch processing. |
 | `--output` | `-o` | DIRECTORY | *required* | Parent directory for all outputs. Will be created if it doesn't exist. |
 | `--backend` | | TEXT | automatic | Backend for reading slides (pyvips only; other values are treated as `pyvips` for compatibility). |
+| `--mpp` | | FLOAT | from metadata | Microns per pixel (assumes square pixels). Overrides slide metadata. Used with `--microns` for physical tile sizes. |
 
 ##### Tile Extraction
 
 | Option | Short | Type | Default | Description |
 |--------|-------|------|---------|-------------|
 | `--level` | `-l` | INTEGER | 0 | Pyramid level for tile extraction (0 = highest resolution). Must be ≥ 0. |
-| `--width` | `-w` | INTEGER | 640 | Tile width in pixels. Must be ≥ 0. |
+| `--width` | `-w` | INTEGER | 640 | Tile width in pixels. Mutually exclusive with `--microns`. Must be ≥ 0. |
 | `--height` | `-h` | INTEGER | width | Tile height in pixels. Defaults to same as width for square tiles. Must be ≥ 0. |
+| `--microns` | `-m` | FLOAT | None | Tile size in microns (physical units). Requires mpp from metadata or `--mpp` option. Mutually exclusive with `--width`/`--height`. |
 | `--overlap` | `-n` | FLOAT | 0.0 | Overlap between neighbouring tiles as a fraction (0.0-1.0). E.g., 0.5 = 50% overlap. |
 | `--max-background` | `-b` | FLOAT | 0.75 | Maximum background ratio allowed in tiles (0.0-1.0). Tiles with more background are excluded. |
 | `--in-bounds` | | FLAG | False | If set, prevents tiles from going out-of-bounds of the slide. |
@@ -105,6 +107,30 @@ histoslice slice \
     --max-background 0.5 \
     --metrics \
     --thumbnails
+```
+
+**Physical scale - Specify tile size in microns:**
+
+```bash
+# Extract 256µm tiles (automatically converted to pixels based on slide mpp)
+histoslice slice \
+    --input './slides/*.tiff' \
+    --output ./tiles \
+    --microns 256 \
+    --overlap 0.5 \
+    --max-background 0.5
+```
+
+**Physical scale with mpp override:**
+
+```bash
+# Override slide mpp if metadata is missing or incorrect
+histoslice slice \
+    --input './slides/*.tiff' \
+    --output ./tiles \
+    --mpp 0.5 \
+    --microns 256 \
+    --overlap 0.5
 ```
 
 **Custom tissue detection:**
