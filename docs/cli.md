@@ -48,14 +48,16 @@ histoslice slice [OPTIONS]
 | `--input` | `-i` | TEXT | *required* | File pattern to glob (e.g., `'./slides/*.tiff'`). Supports wildcards for batch processing. |
 | `--output` | `-o` | DIRECTORY | *required* | Parent directory for all outputs. Will be created if it doesn't exist. |
 | `--backend` | | TEXT | automatic | Backend for reading slides (pyvips only; other values are treated as `pyvips` for compatibility). |
+| `--mpp` | | FLOAT | from metadata | Microns per pixel (assumes square pixels). Overrides slide metadata. Used with `--target-mpp` for normalization. |
 
 ##### Tile Extraction
 
 | Option | Short | Type | Default | Description |
 |--------|-------|------|---------|-------------|
 | `--level` | `-l` | INTEGER | 0 | Pyramid level for tile extraction (0 = highest resolution). Must be ≥ 0. |
-| `--width` | `-w` | INTEGER | 640 | Tile width in pixels. Must be ≥ 0. |
-| `--height` | `-h` | INTEGER | width | Tile height in pixels. Defaults to same as width for square tiles. Must be ≥ 0. |
+| `--width` | `-w` | INTEGER | 640 | Tile width in pixels at target resolution. Must be ≥ 0. |
+| `--height` | `-h` | INTEGER | width | Tile height in pixels at target resolution. Defaults to same as width for square tiles. Must be ≥ 0. |
+| `--target-mpp` | | FLOAT | None | Target microns per pixel for normalization. Tiles will be scaled to achieve this resolution. Guarantees consistent physical scale and tensor dimensions. |
 | `--overlap` | `-n` | FLOAT | 0.0 | Overlap between neighbouring tiles as a fraction (0.0-1.0). E.g., 0.5 = 50% overlap. |
 | `--max-background` | `-b` | FLOAT | 0.75 | Maximum background ratio allowed in tiles (0.0-1.0). Tiles with more background are excluded. |
 | `--in-bounds` | | FLAG | False | If set, prevents tiles from going out-of-bounds of the slide. |
@@ -107,6 +109,33 @@ histoslice slice \
     --thumbnails
 ```
 
+**Resolution normalization - Consistent physical scale and tensor dimensions:**
+
+```bash
+# Normalize to 0.5 mpp with 512x512 pixel tiles
+# All slides produce 512x512 tiles representing 256µm x 256µm physical area
+histoslice slice \
+    --input './slides/*.tiff' \
+    --output ./tiles \
+    --width 512 \
+    --target-mpp 0.5 \
+    --overlap 0.5 \
+    --max-background 0.5
+```
+
+**Resolution normalization with mpp override:**
+
+```bash
+# Override slide mpp if metadata is missing or incorrect
+histoslice slice \
+    --input './slides/*.tiff' \
+    --output ./tiles \
+    --mpp 0.5 \
+    --width 512 \
+    --target-mpp 0.25 \
+    --overlap 0.5
+```
+
 **Custom tissue detection:**
 
 ```bash
@@ -115,7 +144,6 @@ histoslice slice \
     --output ./tiles \
     --width 256 \
     --height 256 \
-    --threshold 200 \
     --multiplier 1.1 \
     --max-dimension 4096 \
     --sigma 2.0

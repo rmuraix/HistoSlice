@@ -41,6 +41,14 @@ def io_opts(
             rich_help_panel="Input/output",
         ),
     ] = None,
+    mpp: Annotated[
+        Optional[float],
+        typer.Option(
+            "--mpp",
+            help="Microns per pixel (assumes square pixels). Overrides slide metadata.",
+            rich_help_panel="Input/output",
+        ),
+    ] = None,
 ) -> Dict:
     paths: List[Path] = [
         Path(p) for p in glob.glob(input_pattern, recursive=True) if Path(p).is_file()
@@ -57,7 +65,7 @@ def io_opts(
         f"Found {len(paths)} files matching pattern '{input_pattern}'.",
         fg=typer.colors.CYAN,
     )
-    return {"paths": paths, "parent_dir": parent_dir, "backend": backend}
+    return {"paths": paths, "parent_dir": parent_dir, "backend": backend, "mpp": mpp}
 
 
 # ---- Tile extraction ----
@@ -78,7 +86,7 @@ def tile_opts(
             "--width",
             "-w",
             min=0,
-            help="Tile width.",
+            help="Tile width in pixels at target resolution.",
             rich_help_panel="Tile extraction",
         ),
     ] = 640,
@@ -89,7 +97,16 @@ def tile_opts(
             "-h",
             min=0,
             show_default="width",
-            help="Tile height.",
+            help="Tile height in pixels at target resolution.",
+            rich_help_panel="Tile extraction",
+        ),
+    ] = None,
+    target_mpp: Annotated[
+        Optional[float],
+        typer.Option(
+            "--target-mpp",
+            min=0.0,
+            help="Target microns per pixel for normalization. Tiles will be scaled to achieve this resolution.",
             rich_help_panel="Tile extraction",
         ),
     ] = None,
@@ -129,6 +146,7 @@ def tile_opts(
         "level": level,
         "width": width,
         "height": height,
+        "target_mpp": target_mpp,
         "overlap": overlap,
         "max_background": max_background,
         "in_bounds": in_bounds,
@@ -291,6 +309,7 @@ def save_opts(
 
 class ReaderKwargs(TypedDict):
     backend: Optional[str]
+    mpp: Optional[tuple[float, float]]
 
 
 class TissueKwargs(TypedDict, total=False):
@@ -303,6 +322,7 @@ class TissueKwargs(TypedDict, total=False):
 class TileKwargs(TypedDict):
     width: int
     height: Optional[int]
+    target_mpp: Optional[float]
     overlap: float
     out_of_bounds: bool
     max_background: float

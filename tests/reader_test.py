@@ -534,3 +534,95 @@ def test_estimate_mean_and_std() -> None:
     mean, std = reader.get_mean_and_std(reader.get_tile_coordinates(None, 512))
     assert [round(x, 2) for x in mean] == [0.84, 0.70, 0.78]
     assert [round(x, 2) for x in std] == [0.14, 0.19, 0.14]
+
+
+def test_reader_mpp_from_metadata() -> None:
+    """Test that mpp is extracted from slide metadata."""
+    reader = SlideReader(SLIDE_PATH_JPEG)
+    mpp = reader.mpp
+    assert mpp is not None
+    assert len(mpp) == 2
+    assert mpp[0] > 0
+    assert mpp[1] > 0
+
+
+def test_reader_mpp_override() -> None:
+    """Test that user-provided mpp overrides slide metadata."""
+    reader = SlideReader(SLIDE_PATH_JPEG, mpp=(0.25, 0.25))
+    assert reader.mpp == (0.25, 0.25)
+
+
+def test_reader_mpp_square_override() -> None:
+    """Test mpp override with square pixels."""
+    reader = SlideReader(SLIDE_PATH_JPEG, mpp=(0.5, 0.5))
+    assert reader.mpp == (0.5, 0.5)
+
+
+def test_get_tile_coordinates_with_target_mpp() -> None:
+    """Test tile coordinate generation with target_mpp parameter for normalization."""
+    # Slide with 0.5 mpp, target 0.25 mpp (higher resolution target)
+    # Physical size: 512px * 0.25mpp = 128µm
+    # At slide resolution: 128µm / 0.5mpp = 256px needed
+    # Scale factor = 0.25 / 0.5 = 0.5
+    reader = SlideReader(SLIDE_PATH_JPEG, mpp=(0.5, 0.5))
+    threshold, tissue_mask = reader.get_tissue_mask(level=-1)
+
+    tile_coords = reader.get_tile_coordinates(
+        tissue_mask, width=512, target_mpp=0.25, overlap=0.5, max_background=0.5
+    )
+    # Extract 256 pixels at native 0.5 mpp to represent 512px at 0.25 mpp
+    assert tile_coords.width == 256
+    assert tile_coords.height == 256
+
+
+def test_get_tile_coordinates_target_mpp_downscale() -> None:
+    """Test target_mpp with downscaling (target > slide mpp)."""
+    # Slide with 0.25 mpp, target 0.5 mpp (lower resolution target)
+    # Physical size: 512px * 0.5mpp = 256µm
+    # At slide resolution: 256µm / 0.25mpp = 1024px needed
+    # Scale factor = 0.5 / 0.25 = 2.0
+    reader = SlideReader(SLIDE_PATH_JPEG, mpp=(0.25, 0.25))
+    threshold, tissue_mask = reader.get_tissue_mask(level=-1)
+
+    tile_coords = reader.get_tile_coordinates(
+        tissue_mask, width=512, target_mpp=0.5, overlap=0.5, max_background=0.5
+    )
+    # Extract 1024 pixels at native 0.25 mpp to represent 512px at 0.5 mpp
+    assert tile_coords.width == 1024
+    assert tile_coords.height == 1024
+
+
+def test_get_tile_coordinates_target_mpp_no_mpp() -> None:
+    """Test that target_mpp raises error when slide mpp not available."""
+    from unittest.mock import PropertyMock, patch
+
+    reader = SlideReader(SLIDE_PATH_JPEG)
+
+    # Mock the mpp property to return None
+    with patch.object(
+        type(reader), "mpp", new_callable=PropertyMock, return_value=None
+    ):
+        with pytest.raises(
+            ValueError, match="Target mpp specified but slide mpp not available"
+        ):
+            reader.get_tile_coordinates(None, width=512, target_mpp=0.25)
+
+
+def test_get_tile_coordinates_target_mpp_with_height() -> None:
+    """Test target_mpp with explicit height parameter."""
+    # Test that both width and height are scaled when height is specified
+    reader = SlideReader(SLIDE_PATH_JPEG, mpp=(0.5, 0.5))
+    threshold, tissue_mask = reader.get_tissue_mask(level=-1)
+
+    tile_coords = reader.get_tile_coordinates(
+        tissue_mask,
+        width=512,
+        height=256,
+        target_mpp=0.25,
+        overlap=0.5,
+        max_background=0.5,
+    )
+    # Scale factor = 0.25 / 0.5 = 0.5
+    # Width: 512 * 0.5 = 256px, Height: 256 * 0.5 = 128px
+    assert tile_coords.width == 256
+    assert tile_coords.height == 128

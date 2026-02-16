@@ -12,11 +12,13 @@ class Settings(BaseModel):
     paths: List[Path]
     parent_dir: Path
     backend: Optional[str] = None  # None=automatic
+    mpp: Optional[float] = None
 
     # Tile extraction
     level: int = 0
     width: int = 640
     height: Optional[int] = None
+    target_mpp: Optional[float] = None
     overlap: float = 0.0
     max_background: float = 0.75
     in_bounds: bool = False

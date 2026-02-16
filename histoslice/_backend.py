@@ -83,6 +83,11 @@ class SlideReaderBackend(ABC):
     def level_downsamples(self) -> dict[int, tuple[float, float]]:
         """Image downsample factors (height, width) for each pyramid level."""
 
+    @property
+    @abstractmethod
+    def mpp(self) -> tuple[float, float] | None:
+        """Microns per pixel (mpp_x, mpp_y) at level 0, or None if not available."""
+
     @abstractmethod
     def read_level(self, level: int) -> np.ndarray:
         """Read full pyramid level data.
@@ -228,6 +233,77 @@ class PyVipsBackend(SlideReaderBackend):
     @property
     def level_downsamples(self) -> Dict[int, Tuple[float, float]]:
         return self.__level_downsamples
+
+    @property
+    def mpp(self) -> tuple[float, float] | None:
+        """Extract microns per pixel from slide metadata.
+
+        Tries multiple sources in order:
+        1. OpenSlide properties (openslide.mpp-x, openslide.mpp-y)
+        2. TIFF resolution tags with unit conversion
+        3. Generic resolution tags (xres, yres) assuming mm unit
+
+        Returns:
+            Tuple of (mpp_x, mpp_y) or None if not available.
+        """
+        # Try OpenSlide properties first
+        try:
+            mpp_x = float(self.__img0.get("openslide.mpp-x"))
+            mpp_y = float(self.__img0.get("openslide.mpp-y"))
+            return (mpp_x, mpp_y)
+        except (TypeError, ValueError, AttributeError):
+            pass
+        except Exception:
+            # Catch pyvips.error.Error and any other exceptions
+            pass
+
+        # Try resolution with unit conversion
+        try:
+            xres = float(self.__img0.get("xres"))
+            yres = float(self.__img0.get("yres"))
+
+            # Check for resolution-unit (1=none, 2=inch, 3=cm)
+            try:
+                unit_val = self.__img0.get("resolution-unit")
+                # pyvips can return metadata values as strings, so safely convert
+                unit = int(unit_val) if unit_val is not None else None
+            except (TypeError, ValueError, AttributeError):
+                unit = None
+            except Exception:
+                # Catch pyvips.error.Error and any other exceptions
+                unit = None
+
+            # Validate resolution values
+            if xres <= 0 or yres <= 0:
+                return None
+
+            # Default behavior: xres/yres are in pixels per mm
+            # Convert to microns per pixel: 1000 µm/mm ÷ pixels/mm
+            if unit is None or unit == 1:
+                # Assume mm if no unit specified (libvips default)
+                mpp_x = 1000.0 / xres
+                mpp_y = 1000.0 / yres
+            elif unit == 2:
+                # pixels per inch -> convert to µm per pixel
+                # 25400 µm/inch ÷ pixels/inch
+                mpp_x = 25400.0 / xres
+                mpp_y = 25400.0 / yres
+            elif unit == 3:
+                # pixels per cm -> convert to µm per pixel
+                # 10000 µm/cm ÷ pixels/cm
+                mpp_x = 10000.0 / xres
+                mpp_y = 10000.0 / yres
+            else:
+                return None
+
+            return (mpp_x, mpp_y)
+        except (TypeError, ValueError, AttributeError, ZeroDivisionError):
+            pass
+        except Exception:
+            # Catch pyvips.error.Error and any other exceptions
+            pass
+
+        return None
 
     # -------------------- reading APIs --------------------
     def _synthetic_page(self, level: int) -> "pyvips.Image":
