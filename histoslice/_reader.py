@@ -112,7 +112,7 @@ class SlideReader:
     @property
     def mpp(self) -> tuple[float, float] | None:
         """Microns per pixel (mpp_x, mpp_y) at level 0.
-        
+
         Returns user-provided override if available, otherwise extracts from
         slide metadata. Returns None if not available.
         """
@@ -239,7 +239,7 @@ class SlideReader:
             tissue_mask: Tissue mask for filtering tiles with too much background. If
                 None, the filtering is disabled.
             width: Width of a tile in pixels. Must be specified if `microns` is None.
-            height: Height of a tile in pixels. If None, will be set to `width`. 
+            height: Height of a tile in pixels. If None, will be set to `width`.
                 Defaults to None.
             microns: Physical size of tiles in microns (µm). If specified, converts to
                 pixels using slide mpp. Cannot be used with `width` or `height`.
@@ -278,7 +278,7 @@ class SlideReader:
             height = width
         elif width is None:
             raise ValueError("Must specify either 'width' or 'microns'.")
-        
+
         tile_coordinates = F.get_tile_coordinates(
             dimensions=self.dimensions,
             width=width,

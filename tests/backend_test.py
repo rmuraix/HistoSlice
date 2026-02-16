@@ -164,3 +164,29 @@ def test_read_level_pyvips() -> None:
         pytest.skip("PyVips test data or dependency missing")
     backend = PyVipsBackend(SLIDE_PATH_TIFF)
     assert backend.read_level(-1).shape == (78, 78, 3)
+
+
+def test_pyvips_backend_mpp_jpeg() -> None:
+    """Test mpp extraction from JPEG metadata."""
+    if not HAS_PYVIPS_JPEG_ASSET:
+        pytest.skip("PyVips or JPEG test data missing")
+    backend = PyVipsBackend(SLIDE_PATH_JPEG)
+    mpp = backend.mpp
+    assert mpp is not None
+    assert len(mpp) == 2
+    # Test JPEG has xres/yres ~2.83 pixels/mm -> ~353 µm/pixel
+    assert mpp[0] > 300
+    assert mpp[1] > 300
+
+
+def test_pyvips_backend_mpp_tiff() -> None:
+    """Test mpp extraction from TIFF metadata."""
+    if not HAS_PYVIPS_ASSET:
+        pytest.skip("PyVips test data or dependency missing")
+    backend = PyVipsBackend(SLIDE_PATH_TIFF)
+    mpp = backend.mpp
+    # TIFF test data may or may not have mpp
+    if mpp is not None:
+        assert len(mpp) == 2
+        assert mpp[0] > 0
+        assert mpp[1] > 0

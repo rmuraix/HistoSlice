@@ -237,12 +237,12 @@ class PyVipsBackend(SlideReaderBackend):
     @property
     def mpp(self) -> tuple[float, float] | None:
         """Extract microns per pixel from slide metadata.
-        
+
         Tries multiple sources in order:
         1. OpenSlide properties (openslide.mpp-x, openslide.mpp-y)
         2. TIFF resolution tags with unit conversion
         3. Generic resolution tags (xres, yres) assuming mm unit
-        
+
         Returns:
             Tuple of (mpp_x, mpp_y) or None if not available.
         """
@@ -253,7 +253,7 @@ class PyVipsBackend(SlideReaderBackend):
             return (mpp_x, mpp_y)
         except Exception:
             pass
-        
+
         # Try resolution with unit conversion
         try:
             xres = float(self.__img0.get("xres"))
@@ -263,7 +263,7 @@ class PyVipsBackend(SlideReaderBackend):
                 unit = self.__img0.get("resolution-unit")
             except Exception:
                 unit = None
-            
+
             # Default behavior: xres/yres are in pixels per mm
             # Convert to microns per pixel: 1000 µm/mm ÷ pixels/mm
             if unit is None or unit == 1:
@@ -282,12 +282,12 @@ class PyVipsBackend(SlideReaderBackend):
                 mpp_y = 10000.0 / yres if yres > 0 else None
             else:
                 return None
-                
+
             if mpp_x is not None and mpp_y is not None:
                 return (mpp_x, mpp_y)
         except Exception:
             pass
-        
+
         return None
 
     # -------------------- reading APIs --------------------

@@ -534,3 +534,70 @@ def test_estimate_mean_and_std() -> None:
     mean, std = reader.get_mean_and_std(reader.get_tile_coordinates(None, 512))
     assert [round(x, 2) for x in mean] == [0.84, 0.70, 0.78]
     assert [round(x, 2) for x in std] == [0.14, 0.19, 0.14]
+
+
+def test_reader_mpp_from_metadata() -> None:
+    """Test that mpp is extracted from slide metadata."""
+    reader = SlideReader(SLIDE_PATH_JPEG)
+    mpp = reader.mpp
+    assert mpp is not None
+    assert len(mpp) == 2
+    assert mpp[0] > 0
+    assert mpp[1] > 0
+
+
+def test_reader_mpp_override() -> None:
+    """Test that user-provided mpp overrides slide metadata."""
+    reader = SlideReader(SLIDE_PATH_JPEG, mpp=(0.25, 0.25))
+    assert reader.mpp == (0.25, 0.25)
+
+
+def test_reader_mpp_square_override() -> None:
+    """Test mpp override with square pixels."""
+    reader = SlideReader(SLIDE_PATH_JPEG, mpp=(0.5, 0.5))
+    assert reader.mpp == (0.5, 0.5)
+
+
+def test_get_tile_coordinates_with_microns() -> None:
+    """Test tile coordinate generation with microns parameter."""
+    reader = SlideReader(SLIDE_PATH_JPEG, mpp=(0.5, 0.5))
+    threshold, tissue_mask = reader.get_tissue_mask(level=-1)
+
+    # Test with 256 microns - should give 512 pixels at 0.5 mpp
+    tile_coords = reader.get_tile_coordinates(
+        tissue_mask, microns=256, overlap=0.5, max_background=0.5
+    )
+    assert tile_coords.width == 512
+    assert tile_coords.height == 512
+
+
+def test_get_tile_coordinates_microns_no_mpp() -> None:
+    """Test that microns parameter raises error when mpp not available."""
+    from unittest.mock import PropertyMock, patch
+
+    reader = SlideReader(SLIDE_PATH_JPEG)
+
+    # Mock the mpp property to return None
+    with patch.object(
+        type(reader), "mpp", new_callable=PropertyMock, return_value=None
+    ):
+        with pytest.raises(
+            ValueError, match="Physical size.*specified but mpp not available"
+        ):
+            reader.get_tile_coordinates(None, microns=256)
+
+
+def test_get_tile_coordinates_microns_with_width() -> None:
+    """Test that specifying both microns and width raises error."""
+    reader = SlideReader(SLIDE_PATH_JPEG, mpp=(0.5, 0.5))
+
+    with pytest.raises(ValueError, match="Cannot specify both 'microns' and 'width'"):
+        reader.get_tile_coordinates(None, width=512, microns=256)
+
+
+def test_get_tile_coordinates_neither_width_nor_microns() -> None:
+    """Test that specifying neither width nor microns raises error."""
+    reader = SlideReader(SLIDE_PATH_JPEG)
+
+    with pytest.raises(ValueError, match="Must specify either 'width' or 'microns'"):
+        reader.get_tile_coordinates(None)
