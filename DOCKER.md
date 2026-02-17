@@ -86,8 +86,6 @@ docker run --rm \
 
 Create a `docker-compose.yml`:
 ```yaml
-version: '3.8'
-
 services:
   histoslice:
     image: ghcr.io/rmuraix/histoslice:latest
