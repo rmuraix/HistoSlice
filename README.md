@@ -4,6 +4,7 @@
 
 [![PyPI - Version](https://img.shields.io/pypi/v/histoslice)](https://pypi.org/project/histoslice/)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/histoslice)](https://pypi.org/project/histoslice/)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io-blue?logo=docker)](https://github.com/rmuraix/HistoSlice/pkgs/container/histoslice)
 [![GitHub License](https://img.shields.io/github/license/rmuraix/HistoSlice)](./LICENSE)
 [![Check](https://github.com/rmuraix/HistoSlice/actions/workflows/check.yaml/badge.svg)](https://github.com/rmuraix/HistoSlice/actions/workflows/check.yaml)
 [![Docs](https://github.com/rmuraix/HistoSlice/actions/workflows/docs.yaml/badge.svg)](https://github.com/rmuraix/HistoSlice/actions/workflows/docs.yaml)
@@ -33,6 +34,25 @@ preprocess those tiles (remove tiles with shitty tissue, finger marks etc).
 uv add histoslice
 # or
 pip install histoslice
+```
+
+### Docker
+
+You can also use HistoSlice via Docker, which comes with all dependencies pre-installed:
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/rmuraix/histoslice:latest
+
+# Run CLI (mount your data directory)
+docker run --rm -v $(pwd)/slides:/data/input -v $(pwd)/output:/data/output \
+  ghcr.io/rmuraix/histoslice:latest \
+  --input '/data/input/*.tiff' --output /data/output --width 512 --overlap 0.5
+
+# Use Python API inside container
+docker run --rm -it -v $(pwd):/workspace -w /workspace \
+  ghcr.io/rmuraix/histoslice:latest \
+  python your_script.py
 ```
 
 ## Usage

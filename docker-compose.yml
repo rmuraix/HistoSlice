@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  histoslice:
+    image: ghcr.io/rmuraix/histoslice:latest
+    volumes:
+      - ./slides:/data/input
+      - ./output:/data/output
+    command: --input '/data/input/*.tiff' --output /data/output --width 512 --overlap 0.5 --thumbnails --metrics

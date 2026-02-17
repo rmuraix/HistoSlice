@@ -1,0 +1,48 @@
+# Git
+.git
+.gitignore
+.github
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv/
+ENV/
+env/
+
+# Testing
+.pytest_cache
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Documentation
+docs/
+mkdocs.yml
+.serena/
+
+# Images and examples
+images/
+tests/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Temporary files
+*.log
+.DS_Store
+tmp/
