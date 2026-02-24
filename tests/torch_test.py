@@ -224,3 +224,51 @@ def test_tile_image_dataset_no_pytorch() -> None:
     finally:
         # Restore the original value
         histoslice.utils._torch.HAS_PYTORCH = original_has_pytorch
+
+
+def test_slide_reader_dataset_getitem_no_transform() -> None:
+    """Test SlideReaderDataset.__getitem__ and __len__ with transform=None."""
+    if not HAS_TORCH:
+        return pytest.skip("PyTorch is not installed")
+    reader = SlideReader(SLIDE_PATH_JPEG)
+    coords = reader.get_tile_coordinates(None, 512)
+    dataset = SlideReaderDataset(reader, coords, level=0, transform=None)
+    assert len(dataset) == len(coords)
+    tile, xywh = dataset[0]
+    assert isinstance(tile, np.ndarray)
+    assert xywh.tolist() == list(coords[0])
+
+
+def test_slide_reader_dataset_getitem_with_transform() -> None:
+    """Test SlideReaderDataset.__getitem__ with a transform applied."""
+    if not HAS_TORCH:
+        return pytest.skip("PyTorch is not installed")
+    reader = SlideReader(SLIDE_PATH_JPEG)
+    coords = reader.get_tile_coordinates(None, 512)
+    dataset = SlideReaderDataset(reader, coords, level=0, transform=lambda x: x[..., 0])
+    tile, xywh = dataset[0]
+    assert tile.ndim == 2
+    assert xywh.tolist() == list(coords[0])
+
+
+def test_tile_dataset_cache_reuse() -> None:
+    """Test TileImageDataset cache branch when the same index is accessed twice."""
+    if not HAS_TORCH:
+        return pytest.skip("PyTorch is not installed")
+    clean_temporary_directory()
+    reader = SlideReader(SLIDE_PATH_JPEG)
+    metadata, _ = reader.save_regions(
+        TMP_DIRECTORY, reader.get_tile_coordinates(None, 96)
+    )
+    dataset = TileImageDataset(
+        metadata["path"].to_numpy(),
+        use_cache=True,
+        tile_shape=(96, 96, 3),
+    )
+    # Access index 0 twice: first populates cache, second reads from it
+    image_first, path_first = dataset[0]
+    image_second, path_second = dataset[0]
+    clean_temporary_directory()
+    assert path_first == path_second
+    assert np.equal(image_first, image_second).all()
+    assert 0 in dataset._cached_indices
