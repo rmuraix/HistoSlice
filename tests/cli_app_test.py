@@ -4,10 +4,69 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from histoslice.cli._app import cut_slide, filter_slide_paths, process_slide_outliers
+from histoslice.cli._app import (
+    clean_tiles,
+    cut_slide,
+    cut_slides,
+    filter_slide_paths,
+    process_slide_outliers,
+)
 from tests._utils import TMP_DIRECTORY, clean_temporary_directory
 
 _OUTLIER_DETECTOR_PATH = "histoslice.utils.OutlierDetector"
+
+
+# ---------------------------------------------------------------------------
+# Dict-builder helpers for cut_slides / clean_tiles tests
+# ---------------------------------------------------------------------------
+
+
+def _io(tmp_path, **kw):
+    return {
+        "paths": [tmp_path / "slide.svs"],
+        "parent_dir": tmp_path,
+        "backend": None,
+        "mpp": None,
+        **kw,
+    }
+
+
+def _tile(**kw):
+    return {
+        "level": 0,
+        "width": 640,
+        "height": None,
+        "target_mpp": None,
+        "overlap": 0.0,
+        "max_background": 0.75,
+        "in_bounds": False,
+        **kw,
+    }
+
+
+def _tissue(**kw):
+    return {
+        "threshold": None,
+        "multiplier": 1.05,
+        "tissue_level": None,
+        "max_dimension": 8192,
+        "sigma": 1.0,
+        **kw,
+    }
+
+
+def _save(num_workers=0, **kw):
+    return {
+        "save_metrics": False,
+        "save_masks": False,
+        "save_thumbnails": False,
+        "overwrite": False,
+        "overwrite_unfinished": False,
+        "image_format": "jpeg",
+        "quality": 80,
+        "num_workers": num_workers,
+        **kw,
+    }
 
 
 @pytest.fixture
@@ -480,3 +539,335 @@ def test_filter_slides_overwrite_with_no_prior_output(mock_typer):
         if "Overwriting" in (c.args[0] if c.args else "")
     ]
     assert len(warning_calls) == 0
+
+
+# ---------------------------------------------------------------------------
+# Tests for cut_slides (sequential and parallel paths)
+# ---------------------------------------------------------------------------
+
+
+def _make_parallel_mocks(monkeypatch, cut_result):
+    """Patch ProcessPoolExecutor and as_completed for parallel cut_slides tests."""
+    mock_future = MagicMock()
+    mock_future.result.return_value = cut_result
+
+    mock_pool = MagicMock()
+    mock_pool.__enter__ = MagicMock(return_value=mock_pool)
+    mock_pool.__exit__ = MagicMock(return_value=False)
+    mock_pool.submit.return_value = mock_future
+
+    monkeypatch.setattr(
+        "histoslice.cli._app.ProcessPoolExecutor", MagicMock(return_value=mock_pool)
+    )
+    monkeypatch.setattr(
+        "histoslice.cli._app.as_completed", lambda x, **kw: iter([mock_future])
+    )
+    monkeypatch.setattr("histoslice.cli._app.tqdm", lambda x, **kw: x)
+    return mock_pool
+
+
+def test_cut_slides_sequential_success(monkeypatch, tmp_path):
+    """cut_slides dispatches each slide sequentially and emits no warnings on success."""
+    slide_file = tmp_path / "slide.svs"
+    slide_file.touch()
+
+    mock_filter = MagicMock(return_value=[slide_file])
+    mock_cut = MagicMock(return_value=(slide_file, None, 0))
+    mock_secho = MagicMock()
+
+    monkeypatch.setattr("histoslice.cli._app.filter_slide_paths", mock_filter)
+    monkeypatch.setattr("histoslice.cli._app.cut_slide", mock_cut)
+    monkeypatch.setattr("typer.secho", mock_secho)
+
+    cut_slides(_io(tmp_path), _tile(), _tissue(), _save(num_workers=0))
+
+    mock_cut.assert_called_once()
+    warning_calls = [
+        c for c in mock_secho.call_args_list if c.kwargs.get("fg") == "yellow"
+    ]
+    assert len(warning_calls) == 0
+
+
+def test_cut_slides_sequential_exception(monkeypatch, tmp_path):
+    """cut_slides emits a warning when cut_slide returns an exception."""
+    slide_file = tmp_path / "slide.svs"
+    slide_file.touch()
+
+    monkeypatch.setattr(
+        "histoslice.cli._app.filter_slide_paths", MagicMock(return_value=[slide_file])
+    )
+    monkeypatch.setattr(
+        "histoslice.cli._app.cut_slide",
+        MagicMock(return_value=(slide_file, ValueError("bad slide"), 0)),
+    )
+    mock_secho = MagicMock()
+    monkeypatch.setattr("typer.secho", mock_secho)
+
+    cut_slides(_io(tmp_path), _tile(), _tissue(), _save(num_workers=0))
+
+    warning_calls = [
+        c for c in mock_secho.call_args_list if c.kwargs.get("fg") == "yellow"
+    ]
+    assert len(warning_calls) == 1
+    assert "Could not process" in warning_calls[0].args[0]
+
+
+def test_cut_slides_sequential_tile_failures(monkeypatch, tmp_path):
+    """cut_slides emits a warning when cut_slide reports tile failures."""
+    slide_file = tmp_path / "slide.svs"
+    slide_file.touch()
+
+    monkeypatch.setattr(
+        "histoslice.cli._app.filter_slide_paths", MagicMock(return_value=[slide_file])
+    )
+    monkeypatch.setattr(
+        "histoslice.cli._app.cut_slide", MagicMock(return_value=(slide_file, None, 3))
+    )
+    mock_secho = MagicMock()
+    monkeypatch.setattr("typer.secho", mock_secho)
+
+    cut_slides(_io(tmp_path), _tile(), _tissue(), _save(num_workers=0))
+
+    warning_calls = [
+        c for c in mock_secho.call_args_list if c.kwargs.get("fg") == "yellow"
+    ]
+    assert len(warning_calls) == 1
+    assert "3 failed tile(s)" in warning_calls[0].args[0]
+
+
+def test_cut_slides_parallel_success(monkeypatch, tmp_path):
+    """cut_slides uses ProcessPoolExecutor when num_workers > 0 and emits no warnings on success."""
+    slide_file = tmp_path / "slide.svs"
+    slide_file.touch()
+
+    monkeypatch.setattr(
+        "histoslice.cli._app.filter_slide_paths", MagicMock(return_value=[slide_file])
+    )
+    mock_secho = MagicMock()
+    monkeypatch.setattr("typer.secho", mock_secho)
+
+    mock_pool = _make_parallel_mocks(monkeypatch, (slide_file, None, 0))
+
+    cut_slides(_io(tmp_path), _tile(), _tissue(), _save(num_workers=2))
+
+    mock_pool.__enter__.assert_called_once()
+    warning_calls = [
+        c for c in mock_secho.call_args_list if c.kwargs.get("fg") == "yellow"
+    ]
+    assert len(warning_calls) == 0
+
+
+def test_cut_slides_parallel_exception(monkeypatch, tmp_path):
+    """cut_slides emits a warning when a parallel future returns an exception."""
+    slide_file = tmp_path / "slide.svs"
+    slide_file.touch()
+
+    monkeypatch.setattr(
+        "histoslice.cli._app.filter_slide_paths", MagicMock(return_value=[slide_file])
+    )
+    mock_secho = MagicMock()
+    monkeypatch.setattr("typer.secho", mock_secho)
+
+    _make_parallel_mocks(monkeypatch, (slide_file, RuntimeError("parallel fail"), 0))
+
+    cut_slides(_io(tmp_path), _tile(), _tissue(), _save(num_workers=2))
+
+    warning_calls = [
+        c for c in mock_secho.call_args_list if c.kwargs.get("fg") == "yellow"
+    ]
+    assert len(warning_calls) == 1
+    assert "Could not process" in warning_calls[0].args[0]
+
+
+# ---------------------------------------------------------------------------
+# Tests for clean_tiles (invalid mode, no dirs, sequential, parallel)
+# ---------------------------------------------------------------------------
+
+
+def test_clean_tiles_invalid_mode(monkeypatch):
+    """clean_tiles calls error() when mode is not 'clustering'."""
+    mock_secho = MagicMock()
+    mock_exit = MagicMock()
+    monkeypatch.setattr("typer.secho", mock_secho)
+    monkeypatch.setattr("sys.exit", mock_exit)
+
+    clean_tiles(
+        {
+            "input_pattern": "*",
+            "mode": "unsupported",
+            "num_clusters": 4,
+            "delete": False,
+            "num_workers": 0,
+        }
+    )
+
+    mock_exit.assert_any_call(1)
+    error_calls = [c for c in mock_secho.call_args_list if c.kwargs.get("fg") == "red"]
+    assert any("Unknown mode" in c.args[0] for c in error_calls)
+
+
+def test_clean_tiles_no_slide_dirs(monkeypatch, tmp_path):
+    """clean_tiles calls error() when no slide directories with metadata are found."""
+    mock_secho = MagicMock()
+    mock_exit = MagicMock()
+    monkeypatch.setattr("typer.secho", mock_secho)
+    monkeypatch.setattr("sys.exit", mock_exit)
+    # An empty dir – no metadata.parquet present
+    empty_dir = tmp_path / "empty"
+    empty_dir.mkdir()
+
+    clean_tiles(
+        {
+            "input_pattern": str(empty_dir),
+            "mode": "clustering",
+            "num_clusters": 4,
+            "delete": False,
+            "num_workers": 0,
+        }
+    )
+
+    mock_exit.assert_called_once_with(1)
+    error_calls = [c for c in mock_secho.call_args_list if c.kwargs.get("fg") == "red"]
+    assert any("Found no slide directories" in c.args[0] for c in error_calls)
+
+
+def test_clean_tiles_sequential_success(monkeypatch, tmp_path):
+    """clean_tiles processes each slide dir sequentially and emits no warnings on success."""
+    slide_dir = tmp_path / "slide"
+    slide_dir.mkdir()
+    (slide_dir / "metadata.parquet").touch()
+
+    mock_process = MagicMock(return_value=(slide_dir, None))
+    mock_secho = MagicMock()
+    monkeypatch.setattr("histoslice.cli._app.process_slide_outliers", mock_process)
+    monkeypatch.setattr("typer.secho", mock_secho)
+
+    clean_tiles(
+        {
+            "input_pattern": str(slide_dir),
+            "mode": "clustering",
+            "num_clusters": 4,
+            "delete": False,
+            "num_workers": 0,
+        }
+    )
+
+    mock_process.assert_called_once_with(
+        slide_dir, mode="clustering", num_clusters=4, delete=False
+    )
+    warning_calls = [
+        c for c in mock_secho.call_args_list if c.kwargs.get("fg") == "yellow"
+    ]
+    assert len(warning_calls) == 0
+
+
+def test_clean_tiles_sequential_exception(monkeypatch, tmp_path):
+    """clean_tiles emits a warning when process_slide_outliers returns an exception."""
+    slide_dir = tmp_path / "slide"
+    slide_dir.mkdir()
+    (slide_dir / "metadata.parquet").touch()
+
+    monkeypatch.setattr(
+        "histoslice.cli._app.process_slide_outliers",
+        MagicMock(return_value=(slide_dir, RuntimeError("oops"))),
+    )
+    mock_secho = MagicMock()
+    monkeypatch.setattr("typer.secho", mock_secho)
+
+    clean_tiles(
+        {
+            "input_pattern": str(slide_dir),
+            "mode": "clustering",
+            "num_clusters": 4,
+            "delete": False,
+            "num_workers": 0,
+        }
+    )
+
+    warning_calls = [
+        c for c in mock_secho.call_args_list if c.kwargs.get("fg") == "yellow"
+    ]
+    assert len(warning_calls) == 1
+    assert "Could not process" in warning_calls[0].args[0]
+
+
+def test_clean_tiles_parallel_success(monkeypatch, tmp_path):
+    """clean_tiles uses ProcessPoolExecutor when num_workers > 0 and emits no warnings on success."""
+    slide_dir = tmp_path / "slide"
+    slide_dir.mkdir()
+    (slide_dir / "metadata.parquet").touch()
+
+    mock_future = MagicMock()
+    mock_future.result.return_value = (slide_dir, None)
+
+    mock_pool = MagicMock()
+    mock_pool.__enter__ = MagicMock(return_value=mock_pool)
+    mock_pool.__exit__ = MagicMock(return_value=False)
+    mock_pool.submit.return_value = mock_future
+
+    monkeypatch.setattr(
+        "histoslice.cli._app.ProcessPoolExecutor", MagicMock(return_value=mock_pool)
+    )
+    monkeypatch.setattr(
+        "histoslice.cli._app.as_completed", lambda x, **kw: iter([mock_future])
+    )
+    monkeypatch.setattr("histoslice.cli._app.tqdm", lambda x, **kw: x)
+    mock_secho = MagicMock()
+    monkeypatch.setattr("typer.secho", mock_secho)
+
+    clean_tiles(
+        {
+            "input_pattern": str(slide_dir),
+            "mode": "clustering",
+            "num_clusters": 4,
+            "delete": False,
+            "num_workers": 2,
+        }
+    )
+
+    mock_pool.__enter__.assert_called_once()
+    warning_calls = [
+        c for c in mock_secho.call_args_list if c.kwargs.get("fg") == "yellow"
+    ]
+    assert len(warning_calls) == 0
+
+
+def test_clean_tiles_parallel_exception(monkeypatch, tmp_path):
+    """clean_tiles emits a warning when a parallel future returns an exception."""
+    slide_dir = tmp_path / "slide"
+    slide_dir.mkdir()
+    (slide_dir / "metadata.parquet").touch()
+
+    mock_future = MagicMock()
+    mock_future.result.return_value = (slide_dir, RuntimeError("worker crash"))
+
+    mock_pool = MagicMock()
+    mock_pool.__enter__ = MagicMock(return_value=mock_pool)
+    mock_pool.__exit__ = MagicMock(return_value=False)
+    mock_pool.submit.return_value = mock_future
+
+    monkeypatch.setattr(
+        "histoslice.cli._app.ProcessPoolExecutor", MagicMock(return_value=mock_pool)
+    )
+    monkeypatch.setattr(
+        "histoslice.cli._app.as_completed", lambda x, **kw: iter([mock_future])
+    )
+    monkeypatch.setattr("histoslice.cli._app.tqdm", lambda x, **kw: x)
+    mock_secho = MagicMock()
+    monkeypatch.setattr("typer.secho", mock_secho)
+
+    clean_tiles(
+        {
+            "input_pattern": str(slide_dir),
+            "mode": "clustering",
+            "num_clusters": 4,
+            "delete": False,
+            "num_workers": 2,
+        }
+    )
+
+    warning_calls = [
+        c for c in mock_secho.call_args_list if c.kwargs.get("fg") == "yellow"
+    ]
+    assert len(warning_calls) == 1
+    assert "Could not process" in warning_calls[0].args[0]
