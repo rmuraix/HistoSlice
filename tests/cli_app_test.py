@@ -1,10 +1,13 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 
-from histoslice.cli._app import cut_slide, filter_slide_paths
+from histoslice.cli._app import cut_slide, filter_slide_paths, process_slide_outliers
 from tests._utils import TMP_DIRECTORY, clean_temporary_directory
+
+_OUTLIER_DETECTOR_PATH = "histoslice.utils.OutlierDetector"
 
 
 @pytest.fixture
@@ -287,3 +290,193 @@ def test_error_function_custom_code(monkeypatch):
     error("Test error message", exit_integer=42)
 
     mock_exit.assert_called_once_with(42)
+
+
+def test_cut_slide_with_failures(mock_slide_reader):
+    """Test that cut_slide returns the correct failure count."""
+    path = Path("slide.svs")
+    mock_slide_reader.return_value.save_regions.return_value = (
+        MagicMock(),
+        ["failure1", "failure2"],
+    )
+
+    result_path, exception, failures = cut_slide(
+        path,
+        reader_kwargs={},
+        max_dimension=512,
+        tissue_kwargs={"level": 0},
+        tile_kwargs={},
+        save_kwargs={},
+    )
+
+    assert result_path == path
+    assert exception is None
+    assert failures == 2
+
+
+def _make_outlier_detector_mock(monkeypatch, clusters, paths):
+    """Helper that patches OutlierDetector and returns the mock instance."""
+    mock_instance = MagicMock()
+    mock_instance.cluster_kmeans.return_value = np.array(clusters)
+    mock_instance.paths = np.array(paths)
+
+    mock_class = MagicMock()
+    mock_class.from_parquet.return_value = mock_instance
+
+    monkeypatch.setattr(_OUTLIER_DETECTOR_PATH, mock_class)
+    return mock_class, mock_instance
+
+
+def test_process_slide_outliers_no_metadata(tmp_path):
+    """Test process_slide_outliers when no metadata file is present."""
+    slide_dir = tmp_path / "slide"
+    slide_dir.mkdir()
+
+    result_dir, exception = process_slide_outliers(
+        slide_dir, mode="clustering", num_clusters=3, delete=False
+    )
+
+    assert result_dir == slide_dir
+    assert isinstance(exception, ValueError)
+    assert "No metadata file found" in str(exception)
+
+
+def test_process_slide_outliers_no_outliers(tmp_path, monkeypatch):
+    """Test process_slide_outliers when cluster 0 contains no tiles."""
+    slide_dir = tmp_path / "slide"
+    slide_dir.mkdir()
+    (slide_dir / "metadata.parquet").touch()
+
+    # Cluster labels: none are 0, so outlier_mask is all False
+    _make_outlier_detector_mock(monkeypatch, clusters=[1, 1, 2, 2], paths=[])
+
+    result_dir, exception = process_slide_outliers(
+        slide_dir, mode="clustering", num_clusters=3, delete=False
+    )
+
+    assert result_dir == slide_dir
+    assert exception is None
+
+
+def test_process_slide_outliers_move(tmp_path, monkeypatch):
+    """Test process_slide_outliers moves outlier tiles to an 'outliers' subdirectory."""
+    slide_dir = tmp_path / "slide"
+    slide_dir.mkdir()
+    (slide_dir / "metadata.parquet").touch()
+
+    # Create two tile files that will be identified as outliers (cluster 0)
+    tile1 = slide_dir / "tile_0001.jpeg"
+    tile2 = slide_dir / "tile_0002.jpeg"
+    tile1.touch()
+    tile2.touch()
+
+    _make_outlier_detector_mock(
+        monkeypatch,
+        clusters=[0, 0, 1, 1],
+        paths=[str(tile1), str(tile2), "tile_0003.jpeg", "tile_0004.jpeg"],
+    )
+
+    result_dir, exception = process_slide_outliers(
+        slide_dir, mode="clustering", num_clusters=2, delete=False
+    )
+
+    assert result_dir == slide_dir
+    assert exception is None
+    outliers_dir = slide_dir / "outliers"
+    assert outliers_dir.exists()
+    assert (outliers_dir / tile1.name).exists()
+    assert (outliers_dir / tile2.name).exists()
+    assert not tile1.exists()
+    assert not tile2.exists()
+
+
+def test_process_slide_outliers_delete(tmp_path, monkeypatch):
+    """Test process_slide_outliers deletes outlier tiles when delete=True."""
+    slide_dir = tmp_path / "slide"
+    slide_dir.mkdir()
+    (slide_dir / "metadata.parquet").touch()
+
+    tile1 = slide_dir / "tile_0001.jpeg"
+    tile1.touch()
+
+    _make_outlier_detector_mock(
+        monkeypatch,
+        clusters=[0, 1],
+        paths=[str(tile1), "tile_0002.jpeg"],
+    )
+
+    result_dir, exception = process_slide_outliers(
+        slide_dir, mode="clustering", num_clusters=2, delete=True
+    )
+
+    assert result_dir == slide_dir
+    assert exception is None
+    assert not tile1.exists()
+    assert not (slide_dir / "outliers").exists()
+
+
+def test_process_slide_outliers_missing_tile_skipped(tmp_path, monkeypatch):
+    """Test that process_slide_outliers skips tile paths that no longer exist."""
+    slide_dir = tmp_path / "slide"
+    slide_dir.mkdir()
+    (slide_dir / "metadata.parquet").touch()
+
+    nonexistent = str(slide_dir / "missing_tile.jpeg")
+    _make_outlier_detector_mock(
+        monkeypatch,
+        clusters=[0],
+        paths=[nonexistent],
+    )
+
+    result_dir, exception = process_slide_outliers(
+        slide_dir, mode="clustering", num_clusters=2, delete=False
+    )
+
+    assert result_dir == slide_dir
+    assert exception is None
+    # No outliers dir created because the tile file didn't exist
+    assert not (slide_dir / "outliers").exists()
+
+
+def test_process_slide_outliers_exception(tmp_path, monkeypatch):
+    """Test process_slide_outliers catches and returns unexpected exceptions."""
+    slide_dir = tmp_path / "slide"
+    slide_dir.mkdir()
+    (slide_dir / "metadata.parquet").touch()
+
+    mock_class = MagicMock()
+    mock_class.from_parquet.side_effect = RuntimeError("disk read error")
+    monkeypatch.setattr(_OUTLIER_DETECTOR_PATH, mock_class)
+
+    result_dir, exception = process_slide_outliers(
+        slide_dir, mode="clustering", num_clusters=3, delete=False
+    )
+
+    assert result_dir == slide_dir
+    assert isinstance(exception, RuntimeError)
+    assert "disk read error" in str(exception)
+
+
+def test_filter_slides_overwrite_with_no_prior_output(mock_typer):
+    """Test overwrite=True when there are no processed or interrupted slides."""
+    mock_secho, _ = mock_typer
+    files = [{"name": "slide1.jpeg"}]
+    setup_test_files(files)
+
+    all_paths = [TMP_DIRECTORY / f["name"] for f in files]
+
+    result = filter_slide_paths(
+        all_paths=all_paths,
+        parent_dir=TMP_DIRECTORY,
+        overwrite=True,
+        overwrite_unfinished=False,
+    )
+
+    assert len(result) == 1
+    # No "Overwriting" warning when there is nothing previously processed
+    warning_calls = [
+        c
+        for c in mock_secho.call_args_list
+        if "Overwriting" in (c.args[0] if c.args else "")
+    ]
+    assert len(warning_calls) == 0
