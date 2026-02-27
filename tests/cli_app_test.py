@@ -25,7 +25,6 @@ def _io(tmp_path, **kw):
     return {
         "paths": [tmp_path / "slide.svs"],
         "parent_dir": tmp_path,
-        "backend": None,
         "mpp": None,
         **kw,
     }
@@ -216,7 +215,7 @@ def mock_slide_reader(monkeypatch):
 def test_cut_slide_success(mock_slide_reader):
     """Test a successful run of cut_slide."""
     path = Path("slide.svs")
-    reader_kwargs = {"backend": "openslide"}
+    reader_kwargs = {}
     tissue_kwargs = {"level": 0}
     tile_kwargs = {"width": 256, "height": 256}
     save_kwargs = {"parent_dir": Path("/tmp")}

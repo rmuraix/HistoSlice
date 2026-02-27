@@ -51,7 +51,6 @@ Cut each slide image into smaller tile images.
         --width 512 \
         --overlap 0.5 \
         --max-background 0.5 \
-        --backend pyvips \
         --metrics \
         --thumbnail
     ```
@@ -146,9 +145,6 @@ HistoSlice supports normalizing slides to a consistent physical resolution using
     - Generic resolution metadata (xres, yres)
     
     If your slides don't have mpp metadata, you can provide it manually using the `--mpp` CLI option or `mpp` parameter in the Python API.
-
-!!! note
-    HistoSlice uses **pyvips** as the only slide backend. The `backend` argument is still accepted for compatibility, but it always resolves to pyvips.
 
 Output directory structure will look like this:
 

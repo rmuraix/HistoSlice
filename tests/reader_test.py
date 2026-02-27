@@ -8,7 +8,6 @@ from PIL import Image
 import histoslice.functional as F
 from histoslice import SlideReader
 from histoslice._reader import _save_image
-from histoslice._backend import PyVipsBackend
 from histoslice._data import SpotCoordinates, TileCoordinates
 
 from ._utils import (
@@ -29,11 +28,6 @@ from .backend_test import (
 )
 
 
-def test_reader_init_no_match() -> None:
-    with pytest.raises(ValueError, match="Could not automatically assing reader"):
-        __ = SlideReader(__file__)
-
-
 def test_reader_init_no_file() -> None:
     with pytest.raises(FileNotFoundError):
         __ = SlideReader("i/dont/exist.czi")
@@ -41,11 +35,6 @@ def test_reader_init_no_file() -> None:
 
 def test_reader_init_pyvips() -> None:
     __ = SlideReader(SLIDE_PATH_JPEG)
-    __ = SlideReader(SLIDE_PATH_JPEG, backend=PyVipsBackend)
-    __ = SlideReader(SLIDE_PATH_JPEG, backend="PIL")
-    __ = SlideReader(SLIDE_PATH_JPEG, backend="PILlow")
-    __ = SlideReader(SLIDE_PATH_JPEG, backend="openSLIDe")
-    __ = SlideReader(SLIDE_PATH_JPEG, backend="cZi")
 
 
 def test_reader_init_czi() -> None:
@@ -53,9 +42,6 @@ def test_reader_init_czi() -> None:
         pytest.skip("PyVips or CZI test data missing")
     try:
         __ = SlideReader(SLIDE_PATH_CZI)
-        __ = SlideReader(SLIDE_PATH_CZI, backend=PyVipsBackend)
-        __ = SlideReader(SLIDE_PATH_CZI, backend="CZI")
-        __ = SlideReader(SLIDE_PATH_CZI, backend="cZi")
     except Exception:
         pytest.skip("PyVips cannot read CZI in this environment")
 

@@ -53,7 +53,6 @@ def cut_slides(
 
     kwargs: CutSlideKwargs = {
         "reader_kwargs": {
-            "backend": cfg.backend,
             "mpp": (cfg.mpp, cfg.mpp) if cfg.mpp is not None else None,
         },
         "max_dimension": cfg.max_dimension,
