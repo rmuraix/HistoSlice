@@ -11,7 +11,6 @@ class Settings(BaseModel):
     # Input / Output
     paths: List[Path]
     parent_dir: Path
-    backend: Optional[str] = None  # None=automatic
     mpp: Optional[float] = None
 
     # Tile extraction

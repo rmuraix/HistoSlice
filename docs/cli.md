@@ -47,7 +47,6 @@ histoslice slice [OPTIONS]
 |--------|-------|------|---------|-------------|
 | `--input` | `-i` | TEXT | *required* | File pattern to glob (e.g., `'./slides/*.tiff'`). Supports wildcards for batch processing. |
 | `--output` | `-o` | DIRECTORY | *required* | Parent directory for all outputs. Will be created if it doesn't exist. |
-| `--backend` | | TEXT | automatic | Backend for reading slides (pyvips only; other values are treated as `pyvips` for compatibility). |
 | `--mpp` | | FLOAT | from metadata | Microns per pixel (assumes square pixels). Overrides slide metadata. Used with `--target-mpp` for normalization. |
 
 ##### Tile Extraction
@@ -147,20 +146,6 @@ histoslice slice \
     --multiplier 1.1 \
     --max-dimension 4096 \
     --sigma 2.0
-```
-
-**High-quality tiles with specific backend:**
-
-```bash
-histoslice slice \
-    --input './slides/*.tiff' \
-    --output ./tiles \
-    --width 1024 \
-    --backend pyvips \
-    --image-format png \
-    --metrics \
-    --thumbnails \
-    --num-workers 4
 ```
 
 **Parallel processing with custom tile extraction:**
@@ -398,17 +383,6 @@ Found no files matching pattern './slides/*.tiff'.
 ```
 
 **Solution**: Check your input pattern and ensure files exist. Use absolute paths or verify your current directory.
-
-### Backend errors
-
-If you encounter errors with the default backend, try specifying one explicitly:
-
-```bash
-# Try PyVips
-histoslice slice --input './slides/*.tiff' --output ./tiles --backend pyvips
-```
-
-OpenSlide is no longer supported. Use pyvips.
 
 ### Memory issues
 

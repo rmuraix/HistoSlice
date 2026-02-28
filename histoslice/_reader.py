@@ -22,13 +22,8 @@ from histoslice.functional._tiles import _multiply_xywh
 
 ERROR_WRONG_TYPE = "Expected '{}' to be of type {}, not {}."
 ERROR_NO_THRESHOLD = "Threshold argument is required to save masks/metrics."
-ERROR_AUTOMATIC_BACKEND = (
-    "Could not automatically assing reader for path: '{}'. Please choose from {}."
-)
-ERROR_BACKEND_NAME = "Backend '{}' does not exist, choose from: {}."
 ERROR_OUTPUT_DIR_IS_FILE = "Output directory exists but it is a file."
 ERROR_CANNOT_OVERWRITE = "Output directory exists, but `overwrite=False`."
-AVAILABLE_BACKENDS = ("PYVIPS",)
 
 
 class SlideReader:
@@ -37,25 +32,20 @@ class SlideReader:
     def __init__(
         self,
         path: Union[str, Path],
-        backend: Optional[str] = None,
         mpp: Optional[tuple[float, float]] = None,
     ) -> None:
         """Initialize `SlideReader` instance.
 
         Args:
             path: Path to slide image.
-            backend: Backend to use for reading slide images. If None, attempts to
-                assing the correct backend based on file extension. Defaults to None.
             mpp: Override microns per pixel as (mpp_x, mpp_y). If None, attempts to
                 extract from slide metadata. Defaults to None.
 
         Raises:
             FileNotFoundError: Path does not exist.
-            ValueError: Cannot automatically assign backend for reader.
-            ValueError: Backend name not recognised.
         """
         super().__init__()
-        self._backend = _read_slide(path=path, backend=backend)
+        self._backend = _read_slide(path=path)
         self._mpp_override = mpp
 
     @property
@@ -704,19 +694,14 @@ def _resolve_image_format(image_format: str) -> str:
     return fmt
 
 
-def _read_slide(  # noqa
-    path: Union[str, Path], backend: Optional[str] = None
-) -> PyVipsBackend:
-    """Read slide with the requested backend.
+def _read_slide(path: Union[str, Path]) -> PyVipsBackend:
+    """Read slide using PyVipsBackend.
 
     Args:
-        backend: Backend to use for reading slide images. If None, attempts to
-            assing the correct backend based on file extension. Defaults to None.
+        path: Path to the slide image.
 
     Raises:
         FileNotFoundError: Path does not exist.
-        ValueError: Cannot automatically assign backend for reader.
-        ValueError: Backend name not recognised.
 
     Returns:
         Slide reader backend.
@@ -725,25 +710,7 @@ def _read_slide(  # noqa
         path = Path(path)
     if not path.exists():
         raise FileNotFoundError(str(path.resolve()))
-    if backend is None:
-        try:
-            return PyVipsBackend(path)
-        except Exception as exc:  # pragma: no cover - passthrough
-            raise ValueError(
-                ERROR_AUTOMATIC_BACKEND.format(path, AVAILABLE_BACKENDS)
-            ) from exc
-    if isinstance(backend, str):
-        # Based on backend argument.
-        if any(
-            key in backend.upper() for key in ("PYVIPS", "OPEN", "CZI", "ZEISS", "PIL")
-        ):
-            return PyVipsBackend(path)
-    if isinstance(
-        backend,
-        (type(PyVipsBackend),),
-    ):
-        return backend(path=path)
-    raise ValueError(ERROR_BACKEND_NAME.format(backend, AVAILABLE_BACKENDS))
+    return PyVipsBackend(path)
 
 
 def _read_tile(

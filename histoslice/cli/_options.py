@@ -31,16 +31,6 @@ def io_opts(
             rich_help_panel="Input/output",
         ),
     ],
-    backend: Annotated[
-        Optional[str],
-        typer.Option(
-            "--backend",
-            help="Backend for reading slides.",
-            case_sensitive=False,
-            show_default="automatic",
-            rich_help_panel="Input/output",
-        ),
-    ] = None,
     mpp: Annotated[
         Optional[float],
         typer.Option(
@@ -65,7 +55,7 @@ def io_opts(
         f"Found {len(paths)} files matching pattern '{input_pattern}'.",
         fg=typer.colors.CYAN,
     )
-    return {"paths": paths, "parent_dir": parent_dir, "backend": backend, "mpp": mpp}
+    return {"paths": paths, "parent_dir": parent_dir, "mpp": mpp}
 
 
 # ---- Tile extraction ----
@@ -308,7 +298,6 @@ def save_opts(
 
 
 class ReaderKwargs(TypedDict):
-    backend: Optional[str]
     mpp: Optional[tuple[float, float]]
 
 
