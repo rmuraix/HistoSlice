@@ -203,7 +203,9 @@ def test_run_with_error_single_process(script_runner, monkeypatch) -> None:  # n
 
 
 def test_clean_command_move(script_runner) -> None:  # noqa
-    """Test clean command with move (default) behavior."""
+    """Test clean command creates metadata_clean.parquet with is_outlier and method columns."""
+    import polars as pl
+
     from histoslice import SlideReader
 
     clean_temporary_directory()
@@ -216,12 +218,12 @@ def test_clean_command_move(script_runner) -> None:  # noqa
         threshold=200,
     )
 
-    # Count initial tiles
+    # Count initial tiles (should be unchanged after clean)
     tiles_dir = TMP_DIRECTORY / "slide" / "tiles"
     initial_tile_count = len(list(tiles_dir.glob(f"*.{IMAGE_EXT}")))
     assert initial_tile_count > 0
 
-    # Run clean command (move mode) with directory pattern
+    # Run clean command with directory pattern
     ret = script_runner.run(
         [
             "uv",
@@ -239,25 +241,29 @@ def test_clean_command_move(script_runner) -> None:  # noqa
 
     assert ret.success
 
-    # Check that outliers directory was created
-    outliers_dir = TMP_DIRECTORY / "slide" / "outliers"
-    assert outliers_dir.exists()
+    # Check that metadata_clean.parquet was created
+    clean_parquet = TMP_DIRECTORY / "slide" / "metadata_clean.parquet"
+    assert clean_parquet.exists()
 
-    # Check that some files were moved
-    moved_count = len(list(outliers_dir.glob(f"*.{IMAGE_EXT}")))
-    remaining_count = len(list(tiles_dir.glob(f"*.{IMAGE_EXT}")))
-    assert moved_count > 0
-    assert remaining_count + moved_count == initial_tile_count
+    # Verify it contains is_outlier and method columns
+    df = pl.read_parquet(clean_parquet)
+    assert "is_outlier" in df.columns
+    assert "method" in df.columns
+    assert df["method"].unique().to_list() == ["clustering"]
+
+    # Tile files should be untouched
+    assert len(list(tiles_dir.glob(f"*.{IMAGE_EXT}"))) == initial_tile_count
+    assert not (TMP_DIRECTORY / "slide" / "outliers").exists()
 
     clean_temporary_directory()
 
 
 def test_clean_command_delete(script_runner) -> None:  # noqa
-    """Test clean command with delete behavior."""
+    """Test that the --delete flag is no longer accepted (removed from CLI)."""
     from histoslice import SlideReader
 
     clean_temporary_directory()
-    # First, create tiles with metrics
+    # Create tiles with metrics
     reader = SlideReader(SLIDE_PATH_JPEG)
     reader.save_regions(
         TMP_DIRECTORY,
@@ -266,12 +272,7 @@ def test_clean_command_delete(script_runner) -> None:  # noqa
         threshold=200,
     )
 
-    # Count initial tiles
-    tiles_dir = TMP_DIRECTORY / "slide" / "tiles"
-    initial_tile_count = len(list(tiles_dir.glob(f"*.{IMAGE_EXT}")))
-    assert initial_tile_count > 0
-
-    # Run clean command (delete mode)
+    # Run clean command with --delete (should fail – option no longer exists)
     ret = script_runner.run(
         [
             "uv",
@@ -288,15 +289,9 @@ def test_clean_command_delete(script_runner) -> None:  # noqa
         ]
     )
 
-    assert ret.success
-
-    # Check that some files were deleted
-    remaining_count = len(list(tiles_dir.glob(f"*.{IMAGE_EXT}")))
-    assert remaining_count < initial_tile_count
-
-    # Check that outliers directory was NOT created
-    outliers_dir = TMP_DIRECTORY / "slide" / "outliers"
-    assert not outliers_dir.exists()
+    # --delete is no longer a valid option
+    assert not ret.success
+    assert "No such option" in ret.stderr or "no such option" in ret.stderr.lower()
 
     clean_temporary_directory()
 
@@ -386,7 +381,7 @@ def test_clean_command_unsupported_format(script_runner) -> None:  # noqa
 
 
 def test_clean_command_missing_tile_files(script_runner) -> None:  # noqa
-    """Test clean command when tile files are missing."""
+    """Test clean command succeeds even when some tile files are missing."""
     from histoslice import SlideReader
 
     clean_temporary_directory()
@@ -399,15 +394,14 @@ def test_clean_command_missing_tile_files(script_runner) -> None:  # noqa
         threshold=200,
     )
 
-    # Delete multiple tile files to ensure at least one is an outlier
+    # Delete multiple tile files to simulate a partially missing dataset
     tiles_dir = TMP_DIRECTORY / "slide" / "tiles"
     tile_files = list(tiles_dir.glob(f"*.{IMAGE_EXT}"))
     if len(tile_files) > 10:
-        # Delete the first 10 tile files to increase chance of hitting an outlier
         for i in range(10):
             tile_files[i].unlink()
 
-    # Run clean command
+    # Run clean command – missing files do not affect the parquet output
     ret = script_runner.run(
         [
             "uv",
@@ -423,8 +417,9 @@ def test_clean_command_missing_tile_files(script_runner) -> None:  # noqa
         ]
     )
 
-    # Should succeed - missing files are silently skipped
+    # Should succeed and create metadata_clean.parquet
     assert ret.success
+    assert (TMP_DIRECTORY / "slide" / "metadata_clean.parquet").exists()
 
     clean_temporary_directory()
 

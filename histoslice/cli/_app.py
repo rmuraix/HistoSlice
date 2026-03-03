@@ -124,7 +124,7 @@ def cut_slides(
 def clean_tiles(
     clean: Annotated[Dict, Depends(clean_opts)],
 ) -> None:
-    """Detect and remove outlier tile images using clustering."""
+    """Detect outlier tile images using clustering and save metadata_clean.parquet."""
     import glob
     from pathlib import Path
 
@@ -155,7 +155,6 @@ def clean_tiles(
     clean_kwargs = {
         "mode": clean["mode"],
         "num_clusters": clean["num_clusters"],
-        "delete": clean["delete"],
     }
 
     # Resolve num_workers
@@ -196,34 +195,35 @@ def process_slide_outliers(
     *,
     mode: str,
     num_clusters: int,
-    delete: bool,
 ) -> tuple[Path, Optional[Exception]]:
-    """Process a single slide directory for outlier detection and removal.
+    """Process a single slide directory for outlier detection.
+
+    Detects outlier tiles using clustering and saves a ``metadata_clean.parquet``
+    file alongside the existing ``metadata.parquet``. The new file contains all
+    original metric columns plus two extra columns:
+
+    * ``is_outlier`` – boolean flag indicating whether the tile is an outlier.
+    * ``method`` – the outlier detection method used (e.g., ``"clustering"``).
 
     Args:
         slide_dir: Path to slide directory containing metadata and tiles
         mode: Outlier detection mode (currently only 'clustering')
         num_clusters: Number of clusters for k-means
-        delete: If True, delete outliers; if False, move to 'outliers' subdirectory
 
     Returns:
         Tuple of (slide_dir, exception). Exception is None if successful.
     """
-    import shutil
-    from pathlib import Path
+    import polars as pl
 
     from histoslice.utils import OutlierDetector
 
     try:
         # Find metadata file
-        metadata_path = None
-        if (slide_dir / "metadata.parquet").exists():
-            metadata_path = slide_dir / "metadata.parquet"
-        else:
+        if not (slide_dir / "metadata.parquet").exists():
             return slide_dir, ValueError(f"No metadata file found in {slide_dir}")
 
         # Load metadata
-        detector = OutlierDetector.from_parquet(metadata_path)
+        detector = OutlierDetector.from_parquet(slide_dir / "metadata.parquet")
 
         # Perform clustering
         clusters = detector.cluster_kmeans(num_clusters=num_clusters)
@@ -232,29 +232,15 @@ def process_slide_outliers(
         # The cluster_kmeans method orders clusters by distance from the mean cluster
         # center, so cluster 0 is the most distant (likely outliers).
         outlier_mask = clusters == 0
-        num_outliers = outlier_mask.sum()
 
-        if num_outliers == 0:
-            return slide_dir, None
-
-        # Get paths of outlier tiles
-        outlier_paths = detector.paths[outlier_mask]
-
-        # Process each outlier tile
-        for tile_path in outlier_paths:
-            tile_path = Path(tile_path)
-            if not tile_path.exists():
-                continue
-
-            if delete:
-                # Delete the file
-                tile_path.unlink()
-            else:
-                # Move to outliers subdirectory
-                outliers_dir = slide_dir / "outliers"
-                outliers_dir.mkdir(exist_ok=True)
-                destination = outliers_dir / tile_path.name
-                shutil.move(str(tile_path), str(destination))
+        # Write metadata_clean.parquet with is_outlier and method columns.
+        df = detector.dataframe.with_columns(
+            [
+                pl.Series("is_outlier", outlier_mask),
+                pl.lit(mode).alias("method"),
+            ]
+        )
+        df.write_parquet(slide_dir / "metadata_clean.parquet")
 
         return slide_dir, None
 

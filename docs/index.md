@@ -186,17 +186,11 @@ Histological slide images often contain areas that we would not like to include 
         --width 512 \
         --metrics
     
-    # Then, detect and remove outliers using clustering
+    # Then, detect outliers using clustering and save metadata_clean.parquet
     # Specify the parent directory containing slide outputs
     histoslice clean \
         --input './tiles/*' \
         --num-clusters 4
-    
-    # Or delete outliers instead of moving them
-    histoslice clean \
-        --input './tiles/*' \
-        --num-clusters 4 \
-        --delete
     
     # For parallel processing of multiple slides
     histoslice clean \
@@ -223,6 +217,6 @@ Now we can mark tiles in cluster `0` as outliers!
 
 ![Tiles in cluster 0](https://github.com/rmuraix/HistoSlice/blob/main/images/thumbnail_blue.jpeg?raw=true)
 
-The `clean` command automatically detects outliers in cluster 0 (the cluster most distant from the mean cluster center after k-means clustering orders them by distance) and either moves them to an `outliers` subdirectory (default) or deletes them (with `--delete` flag). The command supports parallel processing of multiple slides using the `--num-workers` option.
+The `clean` command automatically detects outliers in cluster 0 (the cluster most distant from the mean cluster center after k-means clustering orders them by distance) and saves a `metadata_clean.parquet` file in each slide directory. This file contains all original metric columns plus two extra columns: `is_outlier` (boolean) and `method` (the detection method used, e.g. `"clustering"`). The command supports parallel processing of multiple slides using the `--num-workers` option.
 
 For more information on how to use the `OutlierDetector`, see the [API documentation](api/public/outlierdetector/).

@@ -374,9 +374,14 @@ def test_cut_slide_with_failures(mock_slide_reader):
 
 def _make_outlier_detector_mock(monkeypatch, clusters, paths):
     """Helper that patches OutlierDetector and returns the mock instance."""
+    import polars as pl
+
     mock_instance = MagicMock()
     mock_instance.cluster_kmeans.return_value = np.array(clusters)
     mock_instance.paths = np.array(paths)
+    mock_instance.dataframe = pl.DataFrame(
+        {"red_mean": [0.5] * len(clusters), "blue_mean": [0.3] * len(clusters)}
+    )
 
     mock_class = MagicMock()
     mock_class.from_parquet.return_value = mock_instance
@@ -391,7 +396,7 @@ def test_process_slide_outliers_no_metadata(tmp_path):
     slide_dir.mkdir()
 
     result_dir, exception = process_slide_outliers(
-        slide_dir, mode="clustering", num_clusters=3, delete=False
+        slide_dir, mode="clustering", num_clusters=3
     )
 
     assert result_dir == slide_dir
@@ -401,6 +406,8 @@ def test_process_slide_outliers_no_metadata(tmp_path):
 
 def test_process_slide_outliers_no_outliers(tmp_path, monkeypatch):
     """Test process_slide_outliers when cluster 0 contains no tiles."""
+    import polars as pl
+
     slide_dir = tmp_path / "slide"
     slide_dir.mkdir()
     (slide_dir / "metadata.parquet").touch()
@@ -409,90 +416,48 @@ def test_process_slide_outliers_no_outliers(tmp_path, monkeypatch):
     _make_outlier_detector_mock(monkeypatch, clusters=[1, 1, 2, 2], paths=[])
 
     result_dir, exception = process_slide_outliers(
-        slide_dir, mode="clustering", num_clusters=3, delete=False
+        slide_dir, mode="clustering", num_clusters=3
     )
 
     assert result_dir == slide_dir
     assert exception is None
+    clean_parquet = slide_dir / "metadata_clean.parquet"
+    assert clean_parquet.exists()
+    df = pl.read_parquet(clean_parquet)
+    assert "is_outlier" in df.columns
+    assert "method" in df.columns
+    assert df["is_outlier"].to_list() == [False, False, False, False]
+    assert df["method"].to_list() == ["clustering"] * 4
 
 
-def test_process_slide_outliers_move(tmp_path, monkeypatch):
-    """Test process_slide_outliers moves outlier tiles to an 'outliers' subdirectory."""
+def test_process_slide_outliers_writes_metadata_clean(tmp_path, monkeypatch):
+    """Test process_slide_outliers writes metadata_clean.parquet with is_outlier and method."""
+    import polars as pl
+
     slide_dir = tmp_path / "slide"
     slide_dir.mkdir()
     (slide_dir / "metadata.parquet").touch()
-
-    # Create two tile files that will be identified as outliers (cluster 0)
-    tile1 = slide_dir / "tile_0001.jpeg"
-    tile2 = slide_dir / "tile_0002.jpeg"
-    tile1.touch()
-    tile2.touch()
 
     _make_outlier_detector_mock(
         monkeypatch,
         clusters=[0, 0, 1, 1],
-        paths=[str(tile1), str(tile2), "tile_0003.jpeg", "tile_0004.jpeg"],
+        paths=["tile_0001.jpeg", "tile_0002.jpeg", "tile_0003.jpeg", "tile_0004.jpeg"],
     )
 
     result_dir, exception = process_slide_outliers(
-        slide_dir, mode="clustering", num_clusters=2, delete=False
+        slide_dir, mode="clustering", num_clusters=2
     )
 
     assert result_dir == slide_dir
     assert exception is None
-    outliers_dir = slide_dir / "outliers"
-    assert outliers_dir.exists()
-    assert (outliers_dir / tile1.name).exists()
-    assert (outliers_dir / tile2.name).exists()
-    assert not tile1.exists()
-    assert not tile2.exists()
-
-
-def test_process_slide_outliers_delete(tmp_path, monkeypatch):
-    """Test process_slide_outliers deletes outlier tiles when delete=True."""
-    slide_dir = tmp_path / "slide"
-    slide_dir.mkdir()
-    (slide_dir / "metadata.parquet").touch()
-
-    tile1 = slide_dir / "tile_0001.jpeg"
-    tile1.touch()
-
-    _make_outlier_detector_mock(
-        monkeypatch,
-        clusters=[0, 1],
-        paths=[str(tile1), "tile_0002.jpeg"],
-    )
-
-    result_dir, exception = process_slide_outliers(
-        slide_dir, mode="clustering", num_clusters=2, delete=True
-    )
-
-    assert result_dir == slide_dir
-    assert exception is None
-    assert not tile1.exists()
-    assert not (slide_dir / "outliers").exists()
-
-
-def test_process_slide_outliers_missing_tile_skipped(tmp_path, monkeypatch):
-    """Test that process_slide_outliers skips tile paths that no longer exist."""
-    slide_dir = tmp_path / "slide"
-    slide_dir.mkdir()
-    (slide_dir / "metadata.parquet").touch()
-
-    nonexistent = str(slide_dir / "missing_tile.jpeg")
-    _make_outlier_detector_mock(
-        monkeypatch,
-        clusters=[0],
-        paths=[nonexistent],
-    )
-
-    result_dir, exception = process_slide_outliers(
-        slide_dir, mode="clustering", num_clusters=2, delete=False
-    )
-
-    assert result_dir == slide_dir
-    assert exception is None
-    # No outliers dir created because the tile file didn't exist
+    clean_parquet = slide_dir / "metadata_clean.parquet"
+    assert clean_parquet.exists()
+    df = pl.read_parquet(clean_parquet)
+    assert "is_outlier" in df.columns
+    assert "method" in df.columns
+    assert df["is_outlier"].to_list() == [True, True, False, False]
+    assert df["method"].to_list() == ["clustering"] * 4
+    # Original image files are not modified
     assert not (slide_dir / "outliers").exists()
 
 
@@ -507,7 +472,7 @@ def test_process_slide_outliers_exception(tmp_path, monkeypatch):
     monkeypatch.setattr(_OUTLIER_DETECTOR_PATH, mock_class)
 
     result_dir, exception = process_slide_outliers(
-        slide_dir, mode="clustering", num_clusters=3, delete=False
+        slide_dir, mode="clustering", num_clusters=3
     )
 
     assert result_dir == slide_dir
@@ -695,7 +660,6 @@ def test_clean_tiles_invalid_mode(monkeypatch):
             "input_pattern": "*",
             "mode": "unsupported",
             "num_clusters": 4,
-            "delete": False,
             "num_workers": 0,
         }
     )
@@ -720,7 +684,6 @@ def test_clean_tiles_no_slide_dirs(monkeypatch, tmp_path):
             "input_pattern": str(empty_dir),
             "mode": "clustering",
             "num_clusters": 4,
-            "delete": False,
             "num_workers": 0,
         }
     )
@@ -746,14 +709,11 @@ def test_clean_tiles_sequential_success(monkeypatch, tmp_path):
             "input_pattern": str(slide_dir),
             "mode": "clustering",
             "num_clusters": 4,
-            "delete": False,
             "num_workers": 0,
         }
     )
 
-    mock_process.assert_called_once_with(
-        slide_dir, mode="clustering", num_clusters=4, delete=False
-    )
+    mock_process.assert_called_once_with(slide_dir, mode="clustering", num_clusters=4)
     warning_calls = [
         c for c in mock_secho.call_args_list if c.kwargs.get("fg") == "yellow"
     ]
@@ -778,7 +738,6 @@ def test_clean_tiles_sequential_exception(monkeypatch, tmp_path):
             "input_pattern": str(slide_dir),
             "mode": "clustering",
             "num_clusters": 4,
-            "delete": False,
             "num_workers": 0,
         }
     )
@@ -819,7 +778,6 @@ def test_clean_tiles_parallel_success(monkeypatch, tmp_path):
             "input_pattern": str(slide_dir),
             "mode": "clustering",
             "num_clusters": 4,
-            "delete": False,
             "num_workers": 2,
         }
     )
@@ -860,7 +818,6 @@ def test_clean_tiles_parallel_exception(monkeypatch, tmp_path):
             "input_pattern": str(slide_dir),
             "mode": "clustering",
             "num_clusters": 4,
-            "delete": False,
             "num_workers": 2,
         }
     )
