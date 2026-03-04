@@ -659,6 +659,7 @@ def test_clean_tiles_invalid_mode(monkeypatch):
         {
             "input_pattern": "*",
             "mode": "unsupported",
+            "outlier_frac": 0.01,
             "num_clusters": 4,
             "num_workers": 0,
         }
@@ -683,6 +684,7 @@ def test_clean_tiles_no_slide_dirs(monkeypatch, tmp_path):
         {
             "input_pattern": str(empty_dir),
             "mode": "clustering",
+            "outlier_frac": 0.01,
             "num_clusters": 4,
             "num_workers": 0,
         }
@@ -708,12 +710,15 @@ def test_clean_tiles_sequential_success(monkeypatch, tmp_path):
         {
             "input_pattern": str(slide_dir),
             "mode": "clustering",
+            "outlier_frac": 0.01,
             "num_clusters": 4,
             "num_workers": 0,
         }
     )
 
-    mock_process.assert_called_once_with(slide_dir, mode="clustering", num_clusters=4)
+    mock_process.assert_called_once_with(
+        slide_dir, mode="clustering", outlier_frac=0.01, num_clusters=4
+    )
     warning_calls = [
         c for c in mock_secho.call_args_list if c.kwargs.get("fg") == "yellow"
     ]
@@ -737,6 +742,7 @@ def test_clean_tiles_sequential_exception(monkeypatch, tmp_path):
         {
             "input_pattern": str(slide_dir),
             "mode": "clustering",
+            "outlier_frac": 0.01,
             "num_clusters": 4,
             "num_workers": 0,
         }
@@ -777,6 +783,7 @@ def test_clean_tiles_parallel_success(monkeypatch, tmp_path):
         {
             "input_pattern": str(slide_dir),
             "mode": "clustering",
+            "outlier_frac": 0.01,
             "num_clusters": 4,
             "num_workers": 2,
         }
@@ -817,6 +824,7 @@ def test_clean_tiles_parallel_exception(monkeypatch, tmp_path):
         {
             "input_pattern": str(slide_dir),
             "mode": "clustering",
+            "outlier_frac": 0.01,
             "num_clusters": 4,
             "num_workers": 2,
         }
