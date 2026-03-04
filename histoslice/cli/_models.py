@@ -30,6 +30,7 @@ class Settings(BaseModel):
     sigma: float = 1.0
 
     # Saving
+    save_tiles: bool = True
     save_metrics: bool = False
     save_masks: bool = False
     save_thumbnails: bool = False

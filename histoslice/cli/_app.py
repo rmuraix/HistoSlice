@@ -73,6 +73,7 @@ def cut_slides(
         "save_kwargs": {
             "parent_dir": cfg.parent_dir,
             "level": cfg.level,
+            "save_tiles": cfg.save_tiles,
             "save_metrics": cfg.save_metrics,
             "save_masks": cfg.save_masks,
             "save_thumbnails": cfg.save_thumbnails,

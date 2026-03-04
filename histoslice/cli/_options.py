@@ -234,6 +234,15 @@ def save_opts(
             rich_help_panel="Tile saving",
         ),
     ] = False,
+    no_tiles: Annotated[
+        bool,
+        typer.Option(
+            "--no-tiles",
+            show_default="False",
+            help="Skip saving tile images (metadata and non-tile outputs are still saved).",
+            rich_help_panel="Tile saving",
+        ),
+    ] = False,
     overwrite: Annotated[
         bool,
         typer.Option(
@@ -289,6 +298,7 @@ def save_opts(
         "save_metrics": save_metrics,
         "save_masks": save_masks,
         "save_thumbnails": save_thumbnails,
+        "save_tiles": not no_tiles,
         "overwrite": overwrite,
         "overwrite_unfinished": overwrite_unfinished,
         "image_format": image_format,
@@ -320,6 +330,7 @@ class TileKwargs(TypedDict):
 class SaveKwargs(TypedDict):
     parent_dir: Path
     level: int
+    save_tiles: bool
     save_metrics: bool
     save_masks: bool
     save_thumbnails: bool

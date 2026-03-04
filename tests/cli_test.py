@@ -503,3 +503,33 @@ def test_clean_command_no_outliers(script_runner) -> None:  # noqa
     clean_temporary_directory()
 
     clean_temporary_directory()
+
+
+def test_no_tiles(script_runner) -> None:  # noqa
+    """Test --no-tiles flag skips tile images but saves metadata and thumbnails."""
+    clean_temporary_directory()
+    ret = script_runner.run(
+        [
+            "uv",
+            "run",
+            "histoslice",
+            "slice",
+            "-i",
+            str(SLIDE_PATH_JPEG),
+            "-o",
+            str(TMP_DIRECTORY),
+            "--thumbnails",
+            "--no-tiles",
+            "-j",
+            "0",
+        ]
+    )
+    assert ret.success
+    slide_dir = TMP_DIRECTORY / "slide"
+    output_names = sorted([x.name for x in slide_dir.iterdir()])
+    # Tile directory must NOT be present
+    assert "tiles" not in output_names
+    # Metadata and thumbnails must be present
+    assert "metadata.parquet" in output_names
+    assert f"thumbnail.{IMAGE_EXT}" in output_names
+    clean_temporary_directory()
