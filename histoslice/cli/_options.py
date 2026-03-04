@@ -369,15 +369,6 @@ def clean_opts(
             rich_help_panel="Outlier detection",
         ),
     ] = 4,
-    delete: Annotated[
-        bool,
-        typer.Option(
-            "--delete",
-            "-d",
-            help="Delete detected outlier images. If not specified, moves to 'outliers' subdirectory.",
-            rich_help_panel="Output",
-        ),
-    ] = False,
     num_workers: Annotated[
         Optional[int],
         typer.Option(
@@ -394,6 +385,5 @@ def clean_opts(
         "input_pattern": input_pattern,
         "mode": mode,
         "num_clusters": num_clusters,
-        "delete": delete,
         "num_workers": num_workers,
     }
