@@ -250,6 +250,7 @@ def test_clean_command_move(script_runner) -> None:  # noqa
     assert "is_outlier" in df.columns
     assert "method" in df.columns
     assert df["method"].unique().to_list() == ["clustering"]
+    assert df["is_outlier"].any()
 
     # Tile files should be untouched
     assert len(list(tiles_dir.glob(f"*.{IMAGE_EXT}"))) == initial_tile_count
