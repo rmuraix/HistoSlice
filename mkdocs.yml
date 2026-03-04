@@ -43,6 +43,7 @@ nav:
   - API Reference:
     - SlideReader: api/public/slidereader.md
     - OutlierDetector: api/public/outlierdetector.md
+    - PyTorch Datasets: api/public/datasets.md
 plugins:
   - search
   - mkdocstrings
