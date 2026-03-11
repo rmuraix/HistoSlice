@@ -465,6 +465,7 @@ class SlideReader:
         threshold: Optional[int] = None,
         tissue_mask: Optional[np.ndarray] = None,
         overwrite: bool = False,
+        save_tiles: bool = True,
         save_metrics: bool = False,
         save_masks: bool = False,
         save_thumbnails: bool = True,
@@ -486,6 +487,9 @@ class SlideReader:
                 `save_metrics` is True. Defaults to None.
             overwrite: Overwrite everything in `parent_dir/{slide_name}/` if it exists.
                 Defaults to False.
+            save_tiles: Save tile images to disk. When False, only metadata and
+                non-tile outputs (thumbnails, masks, metrics) are saved, reducing disk
+                usage. Defaults to True.
             save_metrics: Save image metrics to metadata, requires that threshold is
                 set. Defaults to False.
             save_masks: Save tissue masks as `png` images, requires that threshold is
@@ -604,6 +608,7 @@ class SlideReader:
             file_prefixes=coordinates.spot_names
             if isinstance(coordinates, SpotCoordinates)
             else None,
+            save_tiles=save_tiles,
             verbose=verbose,
         )
         metadata.write_parquet(output_dir / "metadata.parquet")
@@ -635,6 +640,7 @@ class RegionData:
         quality: int,
         image_format: str,
         prefix: Optional[str],
+        save_image: bool = True,
     ) -> dict[str, float]:
         """Save image (and mask) and return region metadata."""
         metadata = dict(zip("xywh", xywh))
@@ -642,15 +648,16 @@ class RegionData:
         if prefix is not None:
             filename = f"{prefix}_{filename}"
         # Save image.
-        image_path = image_dir / f"{filename}.{image_format}"
-        image_path.parent.mkdir(parents=True, exist_ok=True)
-        _save_image(
-            Image.fromarray(self.image),
-            image_path,
-            image_format=image_format,
-            quality=quality,
-        )
-        metadata["path"] = str(image_path.resolve())
+        if save_image:
+            image_path = image_dir / f"{filename}.{image_format}"
+            image_path.parent.mkdir(parents=True, exist_ok=True)
+            _save_image(
+                Image.fromarray(self.image),
+                image_path,
+                image_format=image_format,
+                quality=quality,
+            )
+            metadata["path"] = str(image_path.resolve())
         # Save mask.
         if self.mask is not None:
             mask_path = mask_dir / f"{filename}.png"
@@ -779,6 +786,7 @@ def _save_regions(
     image_format: str,
     image_dir: str,
     file_prefixes: list[str],
+    save_tiles: bool = True,
     verbose: bool,
 ) -> tuple[pl.DataFrame, list[dict[str, object]]]:
     """Save region data to output directory.
@@ -792,6 +800,7 @@ def _save_regions(
         image_format: Image extension.
         image_dir: Image directory name
         file_prefixes: List of file prefixes.
+        save_tiles: Save tile images to disk. Defaults to True.
         verbose: Enable progress bar.
 
     Returns:
@@ -825,6 +834,7 @@ def _save_regions(
                 quality=quality,
                 image_format=image_format,
                 prefix=None if file_prefixes is None else file_prefixes[i],
+                save_image=save_tiles,
             )
         )
     return pl.DataFrame(rows), failures

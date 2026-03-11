@@ -58,6 +58,50 @@ class SlideReaderDataset(Dataset):
         self.transform = transform
         self.__first_sample = True
 
+    @classmethod
+    def from_metadata(
+        cls,
+        reader: SlideReader,
+        metadata: Union[str, Path, Any],
+        level: int = 0,
+        transform: Optional[Callable[[np.ndarray], Any]] = None,
+    ) -> "SlideReaderDataset":
+        """Create a SlideReaderDataset from a metadata parquet file or dataframe.
+
+        This is useful when tiles were not saved to disk (e.g. when using
+        ``--no-tiles`` in the CLI). The metadata must contain ``x``, ``y``,
+        ``w``, and ``h`` columns with tile coordinates.
+
+        Args:
+            reader: `SlideReader` instance for the corresponding slide.
+            metadata: Path to a ``metadata.parquet`` file, or a
+                ``polars.DataFrame`` with ``x``, ``y``, ``w``, ``h`` columns.
+            level: Slide level for reading tile images. Defaults to 0.
+            transform: Transform function for tile images. Defaults to None.
+
+        Returns:
+            SlideReaderDataset loading tiles on-the-fly from the slide.
+        """
+        import polars as pl
+
+        if not isinstance(metadata, pl.DataFrame):
+            metadata = pl.read_parquet(metadata)
+        required = {"x", "y", "w", "h"}
+        missing = required - set(metadata.columns)
+        if missing:
+            raise ValueError(
+                f"Metadata must contain columns: x, y, w, h. Missing: {sorted(missing)}"
+            )
+        coordinates = list(
+            zip(
+                metadata["x"].to_list(),
+                metadata["y"].to_list(),
+                metadata["w"].to_list(),
+                metadata["h"].to_list(),
+            )
+        )
+        return cls(reader, coordinates, level=level, transform=transform)
+
     def __len__(self) -> int:
         return len(self.coordinates)
 
