@@ -355,10 +355,20 @@ def clean_opts(
         typer.Option(
             "--mode",
             "-m",
-            help="Outlier detection mode.",
+            help="Outlier detection mode ('calibrate' or 'clustering').",
             rich_help_panel="Outlier detection",
         ),
-    ] = "clustering",
+    ] = "calibrate",
+    outlier_frac: Annotated[
+        float,
+        typer.Option(
+            "--outlier-frac",
+            min=0.0,
+            max=1.0,
+            help="Fraction of tiles to label as outliers (used in calibrate mode).",
+            rich_help_panel="Outlier detection",
+        ),
+    ] = 0.01,
     num_clusters: Annotated[
         int,
         typer.Option(
@@ -384,6 +394,7 @@ def clean_opts(
     return {
         "input_pattern": input_pattern,
         "mode": mode,
+        "outlier_frac": outlier_frac,
         "num_clusters": num_clusters,
         "num_workers": num_workers,
     }

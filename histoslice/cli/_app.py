@@ -1,12 +1,14 @@
 """CLI interface for cutting slides into small tile images."""
 
+from __future__ import annotations
+
 import functools
 import multiprocessing as mp
 import os
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import Dict, NoReturn, Optional
+from typing import TYPE_CHECKING, Dict, NoReturn, Optional
 
 import typer
 from tqdm import tqdm
@@ -28,6 +30,10 @@ from histoslice.cli._options import (
     tissue_opts,
 )
 from histoslice.functional._concurrent import DEFAULT_START_METHOD
+
+if TYPE_CHECKING:
+    import numpy as np
+    import polars as pl
 
 app = TyperDI(
     name="histoslice", help="Tools for preprocessing histological slide images."
@@ -124,14 +130,14 @@ def cut_slides(
 def clean_tiles(
     clean: Annotated[Dict, Depends(clean_opts)],
 ) -> None:
-    """Detect outlier tile images using clustering and save metadata_clean.parquet."""
+    """Detect outlier tile images and save metadata_clean.parquet."""
     import glob
     from pathlib import Path
 
     # Validate mode
-    if clean["mode"] != "clustering":
+    if clean["mode"] not in ("calibrate", "clustering"):
         error(
-            f"Unknown mode '{clean['mode']}'. Currently only 'clustering' is supported."
+            f"Unknown mode '{clean['mode']}'. Supported modes: 'calibrate', 'clustering'."
         )
 
     # Find slide directories (each containing tiles and metadata)
@@ -154,6 +160,7 @@ def clean_tiles(
     # Prepare kwargs for processing
     clean_kwargs = {
         "mode": clean["mode"],
+        "outlier_frac": clean["outlier_frac"],
         "num_clusters": clean["num_clusters"],
     }
 
@@ -194,20 +201,23 @@ def process_slide_outliers(
     slide_dir: Path,
     *,
     mode: str,
+    outlier_frac: float = 0.01,
     num_clusters: int,
 ) -> tuple[Path, Optional[Exception]]:
     """Process a single slide directory for outlier detection.
 
-    Detects outlier tiles using clustering and saves a ``metadata_clean.parquet``
-    file alongside the existing ``metadata.parquet``. The new file contains all
-    original metric columns plus two extra columns:
+    Detects outlier tiles and saves a ``metadata_clean.parquet`` file alongside
+    the existing ``metadata.parquet``. The new file contains all original metric
+    columns plus extra columns:
 
     * ``is_outlier`` – boolean flag indicating whether the tile is an outlier.
-    * ``method`` – the outlier detection method used (e.g., ``"clustering"``).
+    * ``method`` – the outlier detection method used.
+    * ``outlier_score`` – continuous anomaly score (calibrate mode only).
 
     Args:
         slide_dir: Path to slide directory containing metadata and tiles
-        mode: Outlier detection mode (currently only 'clustering')
+        mode: Outlier detection mode ('calibrate' or 'clustering')
+        outlier_frac: Fraction of tiles to label as outliers (calibrate mode only)
         num_clusters: Number of clusters for k-means
 
     Returns:
@@ -225,27 +235,162 @@ def process_slide_outliers(
         # Load metadata
         detector = OutlierDetector.from_parquet(slide_dir / "metadata.parquet")
 
-        # Perform clustering
-        clusters = detector.cluster_kmeans(num_clusters=num_clusters)
+        if mode == "calibrate":
+            scores, is_outlier = _calibrate_slide_outliers(
+                detector.dataframe, outlier_frac=outlier_frac
+            )
+            import numpy as np
 
-        # Cluster 0 contains outliers after reordering by distance from mean center.
-        # The cluster_kmeans method orders clusters by distance from the mean cluster
-        # center, so cluster 0 is the most distant (likely outliers).
-        outlier_mask = clusters == 0
+            df = detector.dataframe.with_columns(
+                [
+                    pl.Series("is_outlier", is_outlier.astype(bool)),
+                    pl.lit(mode).alias("method"),
+                    pl.Series("outlier_score", scores.astype(np.float64)),
+                ]
+            )
+        else:
+            # clustering mode
+            clusters = detector.cluster_kmeans(num_clusters=num_clusters)
 
-        # Write metadata_clean.parquet with is_outlier and method columns.
-        df = detector.dataframe.with_columns(
-            [
-                pl.Series("is_outlier", outlier_mask),
-                pl.lit(mode).alias("method"),
-            ]
-        )
+            # Cluster 0 contains outliers after reordering by distance from mean center.
+            # The cluster_kmeans method orders clusters by distance from the mean cluster
+            # center, so cluster 0 is the most distant (likely outliers).
+            outlier_mask = clusters == 0
+
+            # Write metadata_clean.parquet with is_outlier and method columns.
+            df = detector.dataframe.with_columns(
+                [
+                    pl.Series("is_outlier", outlier_mask),
+                    pl.lit(mode).alias("method"),
+                ]
+            )
+
         df.write_parquet(slide_dir / "metadata_clean.parquet")
 
         return slide_dir, None
 
     except Exception as e:
         return slide_dir, e
+
+
+def _build_calibrate_features(df: "pl.DataFrame") -> "np.ndarray":
+    """Build a feature matrix for calibrate outlier detection from tile metadata.
+
+    For each channel (gray, red, green, blue, saturation, brightness) derives
+    five quantile-based shape features: range, high tail, low tail, skew, and
+    median.  Also appends ``laplacian_std`` when present.
+
+    Args:
+        df: Polars dataframe with tile metadata quantile columns.
+
+    Returns:
+        2-D float64 array of shape ``(n_tiles, n_features)``.
+
+    Raises:
+        ValueError: No usable quantile columns found in the dataframe.
+    """
+    import numpy as np
+
+    channels = ["gray", "red", "green", "blue", "saturation", "brightness"]
+    cols = []
+    for c in channels:
+        required = [f"{c}_q5", f"{c}_q10", f"{c}_q50", f"{c}_q90", f"{c}_q95"]
+        if not all(col in df.columns for col in required):
+            continue
+        v5 = df[f"{c}_q5"].to_numpy().astype(np.float64)
+        v10 = df[f"{c}_q10"].to_numpy().astype(np.float64)
+        v50 = df[f"{c}_q50"].to_numpy().astype(np.float64)
+        v90 = df[f"{c}_q90"].to_numpy().astype(np.float64)
+        v95 = df[f"{c}_q95"].to_numpy().astype(np.float64)
+        cols.extend(
+            [
+                v95 - v5,  # range
+                v95 - v90,  # tail_hi
+                v10 - v5,  # tail_lo
+                (v90 - v50) - (v50 - v10),  # skew
+                v50,  # median
+            ]
+        )
+    if "laplacian_std" in df.columns:
+        cols.append(df["laplacian_std"].to_numpy().astype(np.float64))
+    if not cols:
+        raise ValueError("No usable feature columns found for calibrate mode.")
+    return np.column_stack(cols)
+
+
+def _calibrate_slide_outliers(
+    df: "pl.DataFrame",
+    *,
+    outlier_frac: float,
+) -> tuple["np.ndarray", "np.ndarray"]:
+    """Compute MCD-based outlier scores and binary labels for a slide.
+
+    Uses Minimum Covariance Determinant (MCD) robust covariance fitting to
+    compute Mahalanobis distances as anomaly scores.  Heavy outliers are
+    optionally trimmed before fitting to prevent distorting the model.
+
+    Args:
+        df: Polars dataframe with tile metadata.
+        outlier_frac: Fraction of tiles to label as outliers.
+
+    Returns:
+        Tuple ``(scores, is_outlier)`` where *scores* are float64 Mahalanobis
+        distances and *is_outlier* is a boolean array.
+    """
+    import numpy as np
+    from sklearn.covariance import MinCovDet
+
+    X = _build_calibrate_features(df)
+    n_samples, n_features = X.shape
+
+    # Deterministic light trimming to exclude extreme artifacts before fitting.
+    fit_mask = np.ones(n_samples, dtype=bool)
+    if "saturation_q95" in df.columns:
+        sat = df["saturation_q95"].to_numpy().astype(np.float64)
+        fit_mask &= sat <= np.quantile(sat, 0.98)
+    if "brightness_q5" in df.columns:
+        brt = df["brightness_q5"].to_numpy().astype(np.float64)
+        fit_mask &= brt >= np.quantile(brt, 0.01)
+
+    # Fall back to all tiles if trimming removes too many.
+    if fit_mask.sum() < 0.3 * n_samples:
+        fit_mask = np.ones(n_samples, dtype=bool)
+
+    X_fit = X[fit_mask]
+
+    # Subsample for very large slides (keep deterministic via fixed seed).
+    _MAX_FIT = 5000
+    if len(X_fit) > _MAX_FIT:
+        rng = np.random.default_rng(42)
+        idx = rng.choice(len(X_fit), size=_MAX_FIT, replace=False)
+        X_fit = X_fit[idx]
+
+    scores: np.ndarray
+    min_samples = max(n_features + 1, 10)
+    if len(X_fit) >= min_samples:
+        try:
+            mcd = MinCovDet(random_state=42)
+            mcd.fit(X_fit)
+            scores = mcd.mahalanobis(X)
+        except Exception:
+            scores = _fallback_scores(X)
+    else:
+        scores = _fallback_scores(X)
+
+    threshold = np.quantile(scores, 1.0 - outlier_frac)
+    is_outlier = scores > threshold
+    return scores, is_outlier
+
+
+def _fallback_scores(X: "np.ndarray") -> "np.ndarray":
+    """Return absolute z-scores on the first feature as a fallback."""
+    import numpy as np
+
+    col = X[:, 0]
+    std = col.std()
+    if std == 0 or len(col) < 2:
+        return np.zeros(len(col))
+    return np.abs((col - col.mean()) / std)
 
 
 def filter_slide_paths(  # noqa
