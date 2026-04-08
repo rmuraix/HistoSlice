@@ -272,3 +272,64 @@ def test_tile_dataset_cache_reuse() -> None:
     assert path_first == path_second
     assert np.equal(image_first, image_second).all()
     assert 0 in dataset._cached_indices
+
+
+def test_slide_reader_dataset_from_metadata() -> None:
+    """Test SlideReaderDataset.from_metadata loads coordinates from parquet."""
+    if not HAS_TORCH:
+        return pytest.skip("PyTorch is not installed")
+    clean_temporary_directory()
+    reader = SlideReader(SLIDE_PATH_JPEG)
+    metadata, _ = reader.save_regions(
+        TMP_DIRECTORY,
+        reader.get_tile_coordinates(None, 96),
+        save_tiles=False,
+    )
+    # Metadata must have x, y, w, h columns but no path column
+    assert "x" in metadata.columns
+    assert "path" not in metadata.columns
+    # Write parquet so we can load from file path
+    parquet_path = TMP_DIRECTORY / "slide" / "metadata.parquet"
+    assert parquet_path.exists()
+    dataset = SlideReaderDataset.from_metadata(reader, parquet_path, level=0)
+    assert len(dataset) == len(metadata)
+    tile, xywh = dataset[0]
+    assert isinstance(tile, np.ndarray)
+    assert xywh.shape == (4,)
+    # Verify tile matches direct read from slide
+    expected = reader.read_region(tuple(xywh.tolist()), level=0)
+    assert np.array_equal(tile, expected)
+    clean_temporary_directory()
+
+
+def test_slide_reader_dataset_from_metadata_dataframe() -> None:
+    """Test SlideReaderDataset.from_metadata with a DataFrame instead of a path."""
+    if not HAS_TORCH:
+        return pytest.skip("PyTorch is not installed")
+    clean_temporary_directory()
+    reader = SlideReader(SLIDE_PATH_JPEG)
+    metadata, _ = reader.save_regions(
+        TMP_DIRECTORY,
+        reader.get_tile_coordinates(None, 96),
+        save_tiles=False,
+    )
+    dataset = SlideReaderDataset.from_metadata(reader, metadata, level=0)
+    assert len(dataset) == len(metadata)
+    tile, xywh = dataset[0]
+    assert isinstance(tile, np.ndarray)
+    # Verify tile matches direct read from slide
+    expected = reader.read_region(tuple(xywh.tolist()), level=0)
+    assert np.array_equal(tile, expected)
+    clean_temporary_directory()
+
+
+def test_slide_reader_dataset_from_metadata_missing_columns() -> None:
+    """Test SlideReaderDataset.from_metadata raises error for missing columns."""
+    if not HAS_TORCH:
+        return pytest.skip("PyTorch is not installed")
+    import polars as pl
+
+    reader = SlideReader(SLIDE_PATH_JPEG)
+    bad_df = pl.DataFrame({"x": [0], "y": [0]})  # missing w and h
+    with pytest.raises(ValueError, match="Missing:"):
+        SlideReaderDataset.from_metadata(reader, bad_df)
