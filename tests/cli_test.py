@@ -232,6 +232,8 @@ def test_clean_command_move(script_runner) -> None:  # noqa
             "clean",
             "-i",
             str(TMP_DIRECTORY / "slide"),
+            "--mode",
+            "clustering",
             "-k",
             "4",
             "-j",
@@ -501,5 +503,58 @@ def test_clean_command_no_outliers(script_runner) -> None:  # noqa
     # The output should mention either detection or no outliers
 
     clean_temporary_directory()
+
+
+def test_clean_command_calibrate(script_runner) -> None:  # noqa
+    """Test clean command with calibrate mode produces required columns."""
+    import polars as pl
+
+    from histoslice import SlideReader
+
+    clean_temporary_directory()
+    # Create tiles with metrics
+    reader = SlideReader(SLIDE_PATH_JPEG)
+    reader.save_regions(
+        TMP_DIRECTORY,
+        reader.get_tile_coordinates(None, 256, overlap=0.0),
+        save_metrics=True,
+        threshold=200,
+    )
+
+    # Run clean command with calibrate mode (the default)
+    ret = script_runner.run(
+        [
+            "uv",
+            "run",
+            "histoslice",
+            "clean",
+            "-i",
+            str(TMP_DIRECTORY / "slide"),
+            "--mode",
+            "calibrate",
+            "--outlier-frac",
+            "0.05",
+            "-j",
+            "0",
+        ]
+    )
+
+    assert ret.success
+
+    # Check that metadata_clean.parquet was created with required columns
+    clean_parquet = TMP_DIRECTORY / "slide" / "metadata_clean.parquet"
+    assert clean_parquet.exists()
+
+    df = pl.read_parquet(clean_parquet)
+    assert "is_outlier" in df.columns
+    assert "method" in df.columns
+    assert "outlier_score" in df.columns
+    assert df["method"].unique().to_list() == ["calibrate"]
+    assert df["is_outlier"].dtype == pl.Boolean
+    assert df["outlier_score"].dtype in (pl.Float32, pl.Float64)
+
+    # Tile files should be untouched
+    tiles_dir = TMP_DIRECTORY / "slide" / "tiles"
+    assert tiles_dir.exists()
 
     clean_temporary_directory()
