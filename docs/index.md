@@ -41,41 +41,61 @@ uv sync
 
 Cut each slide image into smaller tile images.
 
-`histoslice --help` will show you all available options. For Python API usage, see the [API documentation](api/public/slidereader/). 
+`histoslice slice --help` will show you all available options. For Python API usage, see the [API documentation](api/public/slice_slide/).
 
 === "CLI"
     ```bash
-    histoslice \
+    histoslice slice \
         --input './images/*.tiff' \
         --output ./tiles \
         --width 512 \
         --overlap 0.5 \
         --max-background 0.5 \
         --metrics \
-        --thumbnail
+        --thumbnails
     ```
 === "Python API"
     ```python
-    from histoslice import SlideReader
+    from histoslice import slice_slide
+
+    # Detect tissue, tile, filter, and save in one call.
+    result = slice_slide(
+        "./path/to/slide_image.tiff",
+        "./tiles/",
+        tile_size=512,
+        overlap=0.5,
+        max_background=0.5,
+        save_metrics=True,
+        save_thumbnails=True,
+    )
+    if result.failures:
+        print(f"Some tiles failed: {len(result.failures)}")
+    ```
+=== "Python API (low-level)"
+    ```python
+    from histoslice import Slide, tissue_mask, tile_regions, filter_by_tissue, export_tiles
 
     # Read slide image.
-    reader = SlideReader("./parh/to/slide_image.tiff")
+    slide = Slide("./path/to/slide_image.tiff")
     # Detect tissue.
-    threshold, tissue_mask = reader.get_tissue_mask(level=-1)
-    # Extract overlapping tile coordinates with less than 50% background.
-    tile_coordinates = reader.get_tile_coordinates(
-        tissue_mask, width=512, overlap=0.5, max_background=0.5
+    threshold, mask = tissue_mask(slide.read_level(-1))
+    # Extract overlapping tile regions with less than 50% background.
+    regions = tile_regions(slide.dimensions, size=512, overlap=0.5)
+    regions = filter_by_tissue(
+        regions, mask, slide_dimensions=slide.dimensions, max_background=0.5
     )
     # Save tile images with image metrics for preprocessing.
-    tile_metadata, failures = reader.save_regions(
+    result = export_tiles(
+        slide,
+        regions,
         "./tiles/",
-        tile_coordinates,
+        tile_size=512,
         threshold=threshold,
         save_metrics=True,
-        save_thumbnail=True
+        save_thumbnails=True,
     )
-    if failures:
-        print(f"Some tiles failed: {len(failures)}")
+    if result.failures:
+        print(f"Some tiles failed: {len(result.failures)}")
     ```
 
 ### Physical Scale Normalization
@@ -86,16 +106,16 @@ HistoSlice supports normalizing slides to a consistent physical resolution using
     ```bash
     # Normalize to 0.5 mpp with 512x512 pixel tiles
     # All slides will produce 512x512 tiles representing the same physical area
-    histoslice \
+    histoslice slice \
         --input './images/*.tiff' \
         --output ./tiles \
         --width 512 \
         --target-mpp 0.5 \
         --overlap 0.5 \
         --max-background 0.5
-    
+
     # Override slide mpp if metadata is missing or incorrect
-    histoslice \
+    histoslice slice \
         --input './images/*.tiff' \
         --output ./tiles \
         --mpp 0.5 \
@@ -104,35 +124,57 @@ HistoSlice supports normalizing slides to a consistent physical resolution using
     ```
 === "Python API"
     ```python
-    from histoslice import SlideReader
-    
-    # Read slide image - mpp extracted from metadata
-    reader = SlideReader("./path/to/slide.tiff")
-    print(f"Slide mpp: {reader.mpp}")  # e.g., (0.25, 0.25)
-    
-    # Override mpp if needed
-    reader = SlideReader("./path/to/slide.tiff", mpp=(0.5, 0.5))
-    
-    # Normalize to target resolution - always get 512x512 pixel tiles
-    threshold, tissue_mask = reader.get_tissue_mask(level=-1)
-    tile_coordinates = reader.get_tile_coordinates(
-        tissue_mask, 
-        width=512,       # Output tile size in pixels
-        target_mpp=0.5,  # Target resolution (512px * 0.5mpp = 256µm physical size)
-        overlap=0.5, 
-        max_background=0.5
+    from histoslice import slice_slide
+
+    # Normalize to target resolution - always get 512x512 pixel tiles.
+    # mpp is read from slide metadata unless overridden below.
+    result = slice_slide(
+        "./path/to/slide.tiff",
+        "./tiles/",
+        tile_size=512,      # Output tile size in pixels
+        target_mpp=0.5,     # Target resolution (512px * 0.5mpp = 256µm physical size)
+        overlap=0.5,
+        max_background=0.5,
     )
     # Result: 512x512 pixel tiles representing 256x256 µm physical area
+
+    # Override mpp if slide metadata is missing or incorrect.
+    result = slice_slide(
+        "./path/to/slide.tiff",
+        "./tiles/",
+        tile_size=512,
+        target_mpp=0.25,
+        mpp=(0.5, 0.5),
+    )
+    ```
+=== "Python API (low-level)"
+    ```python
+    from histoslice import Slide
+    from histoslice.tiles import TileSpec, tile_regions
+
+    # Read slide image - mpp extracted from metadata.
+    slide = Slide("./path/to/slide.tiff")
+    print(f"Slide mpp: {slide.mpp}")  # e.g., (0.25, 0.25)
+
+    # TileSpec makes the contract explicit: `size` is the final output size,
+    # `mpp` is the target physical resolution, independent of slide mpp.
+    spec = TileSpec(size=(512, 512), mpp=(0.5, 0.5))
+    # Region is always in level-0 coordinates - this is the level-0 crop size
+    # needed to reach `spec.mpp` after resizing down to `spec.size`.
+    crop_size = spec.level0_size(slide.mpp)
+    regions = tile_regions(slide.dimensions, crop_size, overlap=0.5)
+    # slide.read_tile(region, spec.size) picks an efficient pyramid level and
+    # resizes to exactly 512x512 - export_tiles does this for every region.
     ```
 
 !!! info "Resolution Normalization"
     When `target_mpp` is specified:
-    
+
     - Tiles are extracted at the appropriate resolution to achieve the target mpp
-    - Output tiles are always `width` x `height` pixels (consistent tensor dimensions)
-    - Each tile represents `width * target_mpp` x `height * target_mpp` microns
+    - Output tiles are always `tile_size` pixels (consistent tensor dimensions)
+    - Anisotropic pixel sizes (`mpp_x != mpp_y`) are handled correctly, per axis
     - Example: 512px tiles at 0.5 mpp = 256µm x 256µm physical area
-    
+
     This is ideal for deep learning where you need:
     - **Consistent physical scale** across slides (same biological structures)
     - **Consistent tensor shape** for neural networks (e.g., always 512x512)
@@ -153,10 +195,10 @@ tiles
 └── slide_id
     ├── metadata.parquet       # tile metadata
     ├── failures.json          # per-tile failures (only written if any failures occur)
-    ├── properties.json        # tile properties
     ├── thumbnail.jpeg         # thumbnail image (or .png if JPEG unsupported)
     ├── thumbnail_tiles.jpeg   # thumbnail with tiles (or .png if JPEG unsupported)
     ├── thumbnail_tissue.jpeg  # thumbnail of the tissue mask (or .png if JPEG unsupported)
+    ├── masks                  # per-tile tissue masks (only if save_masks=True / --masks)
     └── tiles
 ```
 
@@ -204,13 +246,11 @@ Histological slide images often contain areas that we would not like to include 
     from histoslice.utils import OutlierDetector
 
     # Let's wrap the tile metadata with a helper class.
-    detector = OutlierDetector(tile_metadata)
+    detector = OutlierDetector(result.metadata)
     # Cluster tiles based on image metrics.
     clusters = detector.cluster_kmeans(num_clusters=4, random_state=666)
-    # Visualise first cluster.
-    reader.get_annotated_thumbnail(
-        image=reader.read_level(-1), coordinates=detector.coordinates[clusters == 0]
-    )
+    # Visualise the first cluster.
+    detector.random_image_collage(clusters == 0)
     ```
 
 Now we can mark tiles in cluster `0` as outliers!

@@ -41,7 +41,11 @@ nav:
   - CLI Reference: cli.md
   - Metadata Reference: metadata.md
   - API Reference:
-    - SlideReader: api/public/slidereader.md
+    - slice_slide: api/public/slice_slide.md
+    - Slide: api/public/slide.md
+    - Tissue Detection: api/public/tissue.md
+    - Tile Regions: api/public/tiles.md
+    - Export: api/public/export.md
     - OutlierDetector: api/public/outlierdetector.md
     - PyTorch Datasets: api/public/datasets.md
 plugins:
