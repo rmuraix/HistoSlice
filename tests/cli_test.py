@@ -3,6 +3,7 @@ from ._utils import (
     SLIDE_PATH_JPEG,
     TMP_DIRECTORY,
     clean_temporary_directory,
+    create_tiles_with_metrics,
 )
 
 
@@ -11,24 +12,6 @@ def create_metadata(unfinished: bool = False) -> None:  # noqa
     meta_path.parent.mkdir(parents=True)
     if not unfinished:
         meta_path.touch()
-
-
-def create_tiles_with_metrics() -> None:  # noqa
-    """Export real tiles (with metrics) for the `clean` command to operate on."""
-    from histoslice import Slide, export_tiles
-    from histoslice.tiles import tile_regions
-
-    slide = Slide(SLIDE_PATH_JPEG)
-    regions = tile_regions(slide.dimensions, 256, overlap=0.0, out_of_bounds=False)
-    export_tiles(
-        slide,
-        regions,
-        TMP_DIRECTORY / slide.name,
-        tile_size=256,
-        save_metrics=True,
-        threshold=200,
-        save_thumbnails=False,
-    )
 
 
 def test_run(script_runner) -> None:  # noqa

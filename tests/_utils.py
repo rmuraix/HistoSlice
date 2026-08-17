@@ -34,6 +34,28 @@ def clean_temporary_directory() -> None:
             time.sleep(0.1)
 
 
+def create_tiles_with_metrics() -> Path:
+    """Export real tiles (with metrics) into `TMP_DIRECTORY`, e.g. as input for
+    the `clean` command / `OutlierDetector`. Returns the slide's output directory.
+    """
+    from histoslice import export_tiles
+    from histoslice.tiles import tile_regions
+
+    slide = Slide(SLIDE_PATH_JPEG)
+    regions = tile_regions(slide.dimensions, 256, overlap=0.0, out_of_bounds=False)
+    output_dir = TMP_DIRECTORY / slide.name
+    export_tiles(
+        slide,
+        regions,
+        output_dir,
+        tile_size=256,
+        save_metrics=True,
+        threshold=200,
+        save_thumbnails=False,
+    )
+    return output_dir
+
+
 # Optional dependency flags and asset availability
 try:
     import pyvips  # noqa: F401

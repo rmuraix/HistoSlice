@@ -47,6 +47,24 @@ def test_clean_empty_mask() -> None:
     assert clean_tissue_mask(empty_mask).sum() == 0
 
 
+def test_clean_tissue_mask_max_area_pixel() -> None:
+    image = Slide(SLIDE_PATH_TMA).read_level(-1)
+    __, mask = tissue_mask(image, sigma=0.0)
+    # A max_area_pixel smaller than every contour drops everything.
+    assert clean_tissue_mask(mask, max_area_pixel=1).sum() == 0
+
+
+def test_clean_tissue_mask_all_contours_below_min_area() -> None:
+    mask = np.zeros((20, 20), dtype=np.uint8)
+    mask[5, 5] = 1  # a single-pixel contour
+    assert clean_tissue_mask(mask, min_area_pixel=1000).sum() == 0
+
+
+def test_tissue_mask_empty_image() -> None:
+    thresh, mask = tissue_mask(np.zeros((0, 0), dtype=np.uint8))
+    assert mask.shape == (0, 0)
+
+
 def test_tissue_mask_edge_cases() -> None:
     """Edge cases that could otherwise cause OpenCV threshold errors."""
     black_white_image = np.array([[0, 255], [0, 255]], dtype=np.uint8)

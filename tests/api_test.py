@@ -4,7 +4,9 @@ import pytest
 from PIL import Image
 
 from histoslice import Slide, slice_slide
+from histoslice.api import mean_and_std
 from histoslice.export import ExportResult
+from histoslice.tiles import tile_regions
 
 from ._utils import SLIDE_PATH_JPEG, TMP_DIRECTORY, clean_temporary_directory
 
@@ -86,3 +88,19 @@ def test_slice_slide_creates_named_output_dir() -> None:
     result = slice_slide(SLIDE_PATH_JPEG, TMP_DIRECTORY, save_thumbnails=False)
     assert result.output_dir == TMP_DIRECTORY / Slide(SLIDE_PATH_JPEG).name
     clean_temporary_directory()
+
+
+def test_mean_and_std() -> None:
+    slide = Slide(SLIDE_PATH_JPEG)
+    regions = tile_regions(slide.dimensions, 512, out_of_bounds=True)
+    mean, std = mean_and_std(slide, regions)
+    assert [round(x, 2) for x in mean] == [0.84, 0.7, 0.78]
+    assert [round(x, 2) for x in std] == [0.14, 0.19, 0.14]
+
+
+def test_mean_and_std_subsamples_when_over_max_samples() -> None:
+    slide = Slide(SLIDE_PATH_JPEG)
+    regions = tile_regions(slide.dimensions, 512, out_of_bounds=True)
+    mean, std = mean_and_std(slide, regions, max_samples=2)
+    assert len(mean) == 3
+    assert len(std) == 3

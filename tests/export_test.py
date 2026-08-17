@@ -4,7 +4,13 @@ import pytest
 from PIL import Image
 
 from histoslice import Slide
-from histoslice.export import ExportResult, _save_image, export_tiles
+from histoslice.export import (
+    ExportResult,
+    _pil_format,
+    _resolve_image_format,
+    _save_image,
+    export_tiles,
+)
 from histoslice.functional import has_jpeg_support
 from histoslice.tiles import Region, tile_regions
 
@@ -193,6 +199,70 @@ def test_export_tiles_per_tile_failure_reporting() -> None:
     assert len(result.metadata) == len(regions) - 1
     assert (result.output_dir / "failures.json").exists()
     clean_temporary_directory()
+
+
+def test_export_tiles_output_dir_is_file_raises() -> None:
+    slide = Slide(SLIDE_PATH_JPEG)
+    clean_temporary_directory()
+    TMP_DIRECTORY.mkdir(parents=True)
+    output_dir = TMP_DIRECTORY / slide.name
+    output_dir.touch()  # a file, not a directory
+    with pytest.raises(NotADirectoryError, match="Output directory exists"):
+        export_tiles(slide, _regions(slide), output_dir, tile_size=512)
+    clean_temporary_directory()
+
+
+def test_export_tiles_thumbnail_resizes_mismatched_tissue_mask() -> None:
+    """A tissue mask read at a different level than the thumbnail is resized
+    to match before being drawn as the tissue overlay."""
+    from histoslice.tissue import tissue_mask as detect_tissue_mask
+
+    slide = Slide(SLIDE_PATH_JPEG)
+    clean_temporary_directory()
+    __, mask = detect_tissue_mask(slide.read_level(-1))
+    assert mask.shape[:2] != slide.level_dimensions[0]
+    result = export_tiles(
+        slide,
+        _regions(slide),
+        TMP_DIRECTORY / slide.name,
+        tile_size=512,
+        thumbnail_level=0,
+        tissue_mask=mask,
+    )
+    assert f"thumbnail_tissue.{IMAGE_EXT}" in [
+        p.name for p in result.output_dir.iterdir()
+    ]
+    clean_temporary_directory()
+
+
+def test_export_tiles_png_thumbnails_are_downscaled() -> None:
+    slide = Slide(SLIDE_PATH_JPEG)
+    clean_temporary_directory()
+    result = export_tiles(
+        slide,
+        _regions(slide),
+        TMP_DIRECTORY / slide.name,
+        tile_size=512,
+        image_format="png",
+        thumbnail_level=0,
+    )
+    thumbnail = Image.open(result.output_dir / "thumbnail.png")
+    assert thumbnail.size[0] * thumbnail.size[1] <= 300_000
+    clean_temporary_directory()
+
+
+def test_resolve_image_format_falls_back_to_png_without_jpeg_support(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr("histoslice.export.has_jpeg_support", lambda: False)
+    assert _resolve_image_format("jpeg") == "png"
+    assert _resolve_image_format("tiff") == "tiff"
+
+
+def test_pil_format() -> None:
+    assert _pil_format("tif") == "TIFF"
+    assert _pil_format("tiff") == "TIFF"
+    assert _pil_format("bmp") == "BMP"
 
 
 def test_save_image_jpeg_conversion() -> None:

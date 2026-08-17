@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 import pytest
 
 from histoslice import Slide
@@ -70,6 +72,8 @@ def test_read_invalid_level() -> None:
         slide.read_level(100)
     with pytest.raises(ValueError, match="Level 100 could not be found"):
         slide.read_region(Region(0, 0, 10, 10), level=100)
+    with pytest.raises(ValueError, match="Level -100 could not be found"):
+        slide.read_level(-100)
 
 
 def test_read_region_level_0() -> None:
@@ -151,3 +155,66 @@ def test_mpp_override() -> None:
 def test_mpp_anisotropic_override() -> None:
     slide = Slide(SLIDE_PATH_JPEG, mpp=(0.25, 0.5))
     assert slide.mpp == (0.25, 0.5)
+
+
+def _slide_with_mocked_metadata(values: dict) -> Slide:
+    """A real `Slide` whose `_page0.get()` is replaced with a fake metadata
+    lookup, to exercise `mpp` extraction edge cases no test asset covers."""
+    slide = Slide(SLIDE_PATH_JPEG)
+    mock_page0 = MagicMock()
+
+    def get(key: str):
+        value = values.get(key, Exception("not available"))
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+    mock_page0.get = MagicMock(side_effect=get)
+    slide._page0 = mock_page0
+    return slide
+
+
+def test_mpp_from_openslide_properties() -> None:
+    slide = _slide_with_mocked_metadata(
+        {"openslide.mpp-x": "0.5", "openslide.mpp-y": "0.6"}
+    )
+    assert slide.mpp == (0.5, 0.6)
+
+
+def test_mpp_resolution_unit_inch() -> None:
+    # 1000 pixels/inch -> 25400 / 1000 = 25.4 um/pixel
+    slide = _slide_with_mocked_metadata(
+        {"xres": 1000.0, "yres": 1000.0, "resolution-unit": 2}
+    )
+    mpp = slide.mpp
+    assert mpp is not None
+    assert abs(mpp[0] - 25.4) < 0.01
+    assert abs(mpp[1] - 25.4) < 0.01
+
+
+def test_mpp_resolution_unit_cm() -> None:
+    # 100 pixels/cm -> 10000 / 100 = 100 um/pixel
+    slide = _slide_with_mocked_metadata(
+        {"xres": 100.0, "yres": 100.0, "resolution-unit": 3}
+    )
+    mpp = slide.mpp
+    assert mpp is not None
+    assert abs(mpp[0] - 100.0) < 0.01
+    assert abs(mpp[1] - 100.0) < 0.01
+
+
+def test_mpp_resolution_unit_invalid() -> None:
+    slide = _slide_with_mocked_metadata(
+        {"xres": 100.0, "yres": 100.0, "resolution-unit": 99}
+    )
+    assert slide.mpp is None
+
+
+def test_mpp_zero_resolution_returns_none() -> None:
+    slide = _slide_with_mocked_metadata({"xres": 0.0, "yres": 100.0})
+    assert slide.mpp is None
+
+
+def test_mpp_completely_unavailable_returns_none() -> None:
+    slide = _slide_with_mocked_metadata({})
+    assert slide.mpp is None

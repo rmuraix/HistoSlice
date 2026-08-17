@@ -11,6 +11,7 @@ from histoslice.tiles import (
     filter_by_tissue,
     get_downsample,
     level0_tile_size,
+    pad_to_shape,
     region_from_array,
     spot_regions,
     tile_regions,
@@ -144,6 +145,27 @@ def test_region_from_array() -> None:
     image = np.arange(9).reshape(3, 3)
     result = region_from_array(image, Region(0, 0, 2, 2))
     assert (result == np.array([[0, 1], [3, 4]])).all()
+
+
+def test_pad_to_shape_exact_fit_is_a_noop() -> None:
+    tile = np.zeros((4, 4, 3), dtype=np.uint8)
+    assert pad_to_shape(tile, shape=(4, 4), fill=0) is tile
+
+
+def test_pad_to_shape_crops_larger_tiles() -> None:
+    tile = np.arange(16, dtype=np.uint8).reshape(4, 4)
+    cropped = pad_to_shape(tile, shape=(2, 3), fill=0)
+    assert cropped.shape == (2, 3)
+    assert (cropped == tile[:2, :3]).all()
+
+
+def test_pad_to_shape_pads_smaller_tiles() -> None:
+    tile = np.ones((2, 2), dtype=np.uint8)
+    padded = pad_to_shape(tile, shape=(4, 4), fill=9)
+    assert padded.shape == (4, 4)
+    assert (padded[:2, :2] == 1).all()
+    assert (padded[2:, :] == 9).all()
+    assert (padded[:, 2:] == 9).all()
 
 
 def test_spot_regions() -> None:
