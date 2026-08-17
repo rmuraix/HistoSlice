@@ -332,17 +332,21 @@ def process_slide_outliers(
 
 
 def warning(msg: str) -> None:
+    """Print `msg` to stdout in bold yellow."""
     typer.secho(msg, fg=typer.colors.YELLOW, bold=True)
 
 
 def info(msg: str) -> None:
+    """Print `msg` to stdout in bold cyan."""
     typer.secho(msg, fg=typer.colors.CYAN, bold=True)
 
 
 def error(msg: str, exit_code: int = 1) -> NoReturn:
+    """Print `msg` to stderr in bold red and exit with `exit_code`."""
     typer.secho(msg, fg=typer.colors.RED, bold=True, err=True)
     sys.exit(exit_code)
 
 
 def main() -> None:
+    """CLI entry point (`histoslice` console script)."""
     app()

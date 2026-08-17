@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 import pyvips
 
-from histoslice.tiles import Region
+from histoslice.tiles import Region, pad_to_shape
 
 ERROR_LEVEL = "Level {} could not be found, select from {}."
 
@@ -189,7 +189,7 @@ class Slide:
         page = self._page(level)
         cropped = page.extract_area(x_l, y_l, allowed_w, allowed_h)
         tile = _to_array(cropped)
-        return _pad_tile(tile, shape=(h_l, w_l))
+        return pad_to_shape(tile, shape=(h_l, w_l), fill=255)
 
     def read_tile(self, region: Region, size: tuple[int, int]) -> np.ndarray:
         """Read `region` and resize to exactly `size` (`width, height`) pixels.
@@ -295,16 +295,3 @@ def _to_array(image: "pyvips.Image") -> np.ndarray:
     if arr.shape[2] > 3:  # noqa
         arr = arr[..., :3]
     return arr
-
-
-def _pad_tile(tile: np.ndarray, *, shape: tuple[int, int]) -> np.ndarray:
-    """Pad `tile` with white pixels up to `shape`, cropping if it is already larger."""
-    tile_h, tile_w = tile.shape[:2]
-    out_h, out_w = shape
-    if tile_h == out_h and tile_w == out_w:
-        return tile
-    if tile_h > out_h or tile_w > out_w:
-        return tile[:out_h, :out_w]
-    output = np.zeros((out_h, out_w, tile.shape[-1]), dtype=np.uint8) + 255
-    output[:tile_h, :tile_w] = tile
-    return output

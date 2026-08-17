@@ -34,6 +34,7 @@ class Region:
 
     @property
     def xywh(self) -> tuple[int, int, int, int]:
+        """This region as an `(x, y, width, height)` tuple."""
         return (self.x, self.y, self.width, self.height)
 
 
@@ -122,7 +123,7 @@ def region_from_array(
     allowed_w = max(min(out_w, image_w - x), 0)
     allowed_h = max(min(out_h, image_h - y), 0)
     cropped = image[y : y + allowed_h, x : x + allowed_w]
-    return _pad(cropped, shape=(out_h, out_w), fill=fill)
+    return pad_to_shape(cropped, shape=(out_h, out_w), fill=fill)
 
 
 def background_percentages(
@@ -266,8 +267,13 @@ def spot_regions(
     return regions, names
 
 
-def _pad(tile: np.ndarray, *, shape: tuple[int, int], fill: int) -> np.ndarray:
-    """Pad or crop `tile` to exactly `shape`, filling new pixels with `fill`."""
+def pad_to_shape(tile: np.ndarray, *, shape: tuple[int, int], fill: int) -> np.ndarray:
+    """Pad or crop `tile` to exactly `shape`, filling new pixels with `fill`.
+
+    Shared by `Slide.read_region` (edge padding, `fill=255`) and
+    `region_from_array` (mask padding, `fill=0`) so there is one place that
+    defines what "out of bounds" pixels look like.
+    """
     tile_h, tile_w = tile.shape[:2]
     out_h, out_w = shape
     if tile_h == out_h and tile_w == out_w:
