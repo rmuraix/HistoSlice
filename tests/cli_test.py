@@ -1,9 +1,12 @@
+import polars as pl
+
 from ._utils import (
     IMAGE_EXT,
     SLIDE_PATH_JPEG,
     TMP_DIRECTORY,
     clean_temporary_directory,
     create_tiles_with_metrics,
+    make_bad_slide_dir,
 )
 
 
@@ -21,6 +24,7 @@ def test_run(script_runner) -> None:  # noqa
         [
             "uv",
             "run",
+            "--no-sync",
             "histoslice",
             "slice",
             "-i",
@@ -45,6 +49,29 @@ def test_run(script_runner) -> None:  # noqa
     clean_temporary_directory()
 
 
+def test_slice_command_parallel(script_runner) -> None:  # noqa
+    """`-j 2` dispatches through `ProcessPoolExecutor` in a real subprocess."""
+    clean_temporary_directory()
+    ret = script_runner.run(
+        [
+            "uv",
+            "run",
+            "--no-sync",
+            "histoslice",
+            "slice",
+            "-i",
+            str(SLIDE_PATH_JPEG),
+            "-o",
+            str(TMP_DIRECTORY),
+            "-j",
+            "2",
+        ]
+    )
+    assert ret.success
+    assert (TMP_DIRECTORY / "slide" / "metadata.parquet").exists()
+    clean_temporary_directory()
+
+
 def test_skip_processed(script_runner) -> None:  # noqa
     clean_temporary_directory()
     create_metadata(unfinished=False)
@@ -52,6 +79,7 @@ def test_skip_processed(script_runner) -> None:  # noqa
         [
             "uv",
             "run",
+            "--no-sync",
             "histoslice",
             "slice",
             "-i",
@@ -75,6 +103,7 @@ def test_overwrite(script_runner) -> None:  # noqa
         [
             "uv",
             "run",
+            "--no-sync",
             "histoslice",
             "slice",
             "-i",
@@ -107,6 +136,7 @@ def test_unfinished(script_runner) -> None:  # noqa
         [
             "uv",
             "run",
+            "--no-sync",
             "histoslice",
             "slice",
             "-i",
@@ -150,6 +180,7 @@ def test_run_with_error_multi_process(script_runner, monkeypatch) -> None:  # no
         [
             "uv",
             "run",
+            "--no-sync",
             "histoslice",
             "slice",
             "-i",
@@ -184,6 +215,7 @@ def test_run_with_error_single_process(script_runner, monkeypatch) -> None:  # n
         [
             "uv",
             "run",
+            "--no-sync",
             "histoslice",
             "slice",
             "-i",
@@ -202,8 +234,6 @@ def test_run_with_error_single_process(script_runner, monkeypatch) -> None:  # n
 
 def test_clean_command_move(script_runner) -> None:  # noqa
     """Test clean command creates metadata_clean.parquet with is_outlier and method columns."""
-    import polars as pl
-
     clean_temporary_directory()
     create_tiles_with_metrics()
 
@@ -217,6 +247,7 @@ def test_clean_command_move(script_runner) -> None:  # noqa
         [
             "uv",
             "run",
+            "--no-sync",
             "histoslice",
             "clean",
             "-i",
@@ -248,6 +279,36 @@ def test_clean_command_move(script_runner) -> None:  # noqa
     clean_temporary_directory()
 
 
+def test_clean_command_parallel(script_runner) -> None:  # noqa
+    """`-j 2` dispatches through `ProcessPoolExecutor` in a real subprocess."""
+    clean_temporary_directory()
+    create_tiles_with_metrics()
+
+    ret = script_runner.run(
+        [
+            "uv",
+            "run",
+            "--no-sync",
+            "histoslice",
+            "clean",
+            "-i",
+            str(TMP_DIRECTORY / "slide"),
+            "-k",
+            "4",
+            "-j",
+            "2",
+        ]
+    )
+
+    assert ret.success
+    clean_parquet = TMP_DIRECTORY / "slide" / "metadata_clean.parquet"
+    assert clean_parquet.exists()
+    df = pl.read_parquet(clean_parquet)
+    assert "is_outlier" in df.columns
+
+    clean_temporary_directory()
+
+
 def test_clean_command_delete(script_runner) -> None:  # noqa
     """Test that the --delete flag is no longer accepted (removed from CLI)."""
     clean_temporary_directory()
@@ -258,6 +319,7 @@ def test_clean_command_delete(script_runner) -> None:  # noqa
         [
             "uv",
             "run",
+            "--no-sync",
             "histoslice",
             "clean",
             "-i",
@@ -285,6 +347,7 @@ def test_clean_command_no_metadata(script_runner) -> None:  # noqa
         [
             "uv",
             "run",
+            "--no-sync",
             "histoslice",
             "clean",
             "-i",
@@ -307,6 +370,7 @@ def test_clean_command_invalid_mode(script_runner) -> None:  # noqa
         [
             "uv",
             "run",
+            "--no-sync",
             "histoslice",
             "clean",
             "-i",
@@ -339,6 +403,7 @@ def test_clean_command_unsupported_format(script_runner) -> None:  # noqa
         [
             "uv",
             "run",
+            "--no-sync",
             "histoslice",
             "clean",
             "-i",
@@ -369,6 +434,7 @@ def test_clean_command_missing_tile_files(script_runner) -> None:  # noqa
         [
             "uv",
             "run",
+            "--no-sync",
             "histoslice",
             "clean",
             "-i",
@@ -401,6 +467,7 @@ def test_clean_command_exception_handling(script_runner, monkeypatch) -> None:  
         [
             "uv",
             "run",
+            "--no-sync",
             "histoslice",
             "clean",
             "-i",
@@ -420,6 +487,32 @@ def test_clean_command_exception_handling(script_runner, monkeypatch) -> None:  
     clean_temporary_directory()
 
 
+def test_clean_command_reports_per_slide_exception_parallel(script_runner) -> None:  # noqa
+    """`-j 2` reports per-slide exceptions the same way as sequential mode."""
+    clean_temporary_directory()
+    create_tiles_with_metrics()
+    make_bad_slide_dir("bad")
+
+    ret = script_runner.run(
+        [
+            "uv",
+            "run",
+            "--no-sync",
+            "histoslice",
+            "clean",
+            "-i",
+            str(TMP_DIRECTORY / "*"),
+            "-j",
+            "2",
+        ]
+    )
+
+    assert ret.success
+    assert "Could not process" in ret.stdout
+
+    clean_temporary_directory()
+
+
 def test_clean_command_no_outliers(script_runner) -> None:  # noqa
     """Test clean command when no outliers are detected."""
     clean_temporary_directory()
@@ -430,6 +523,7 @@ def test_clean_command_no_outliers(script_runner) -> None:  # noqa
         [
             "uv",
             "run",
+            "--no-sync",
             "histoslice",
             "clean",
             "-i",
