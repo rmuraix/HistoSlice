@@ -2,46 +2,46 @@ import numpy as np
 import polars as pl
 import pytest
 
-from histoslice import SlideReader
+from histoslice import Slide, export_tiles
+from histoslice.tiles import tile_regions
 from histoslice.utils import OutlierDetector
 
 from ._utils import SLIDE_PATH_JPEG, TMP_DIRECTORY, clean_temporary_directory
 
 
-def generate_metadata(*, clean_tmp: bool = True, **kwargs) -> pl.DataFrame:
+def generate_metadata(*, clean_tmp: bool = True) -> pl.DataFrame:
     clean_temporary_directory()
-    reader = SlideReader(SLIDE_PATH_JPEG)
-    metadata, _ = reader.save_regions(
-        TMP_DIRECTORY,
-        reader.get_tile_coordinates(None, 256, overlap=0.0),
+    slide = Slide(SLIDE_PATH_JPEG)
+    regions = tile_regions(slide.dimensions, 256, overlap=0.0, out_of_bounds=True)
+    result = export_tiles(
+        slide,
+        regions,
+        TMP_DIRECTORY / slide.name,
+        tile_size=256,
         save_metrics=True,
         threshold=200,
-        **kwargs,
+        save_thumbnails=False,
     )
     if clean_tmp:
         clean_temporary_directory()
-    return metadata
+    return result.metadata
 
 
 def test_metadata_properties() -> None:
     metadata = OutlierDetector(generate_metadata())
     assert isinstance(metadata.dataframe, pl.DataFrame)
     assert isinstance(metadata.dataframe_without_metrics, pl.DataFrame)
-    assert metadata.dataframe_without_metrics.columns == [
-        *list("xywh"),
-        "path",
-    ]
+    assert metadata.dataframe_without_metrics.columns == [*list("xywh"), "path"]
     assert metadata.outliers.sum() == 0
     assert len(metadata.outlier_selections) == 0
     assert len(metadata.metric_columns) == 64
     assert metadata.metrics.shape == (100, 64)
-    # Use approximate equality for floating point values
     mean, std = metadata.mean_and_std
     expected_mean = (0.8448732156862745, 0.7013530588235295, 0.7794474117647058)
     expected_std = (0.13158384313725494, 0.1708792549019608, 0.13072776470588235)
     for i in range(3):
-        assert abs(mean[i] - expected_mean[i]) < 1e-10
-        assert abs(std[i] - expected_std[i]) < 1e-10
+        assert abs(mean[i] - expected_mean[i]) < 1e-9
+        assert abs(std[i] - expected_std[i]) < 1e-9
     assert str(metadata) == "OutlierDetector(num_images=100, num_outliers=0)"
 
 

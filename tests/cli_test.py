@@ -13,6 +13,24 @@ def create_metadata(unfinished: bool = False) -> None:  # noqa
         meta_path.touch()
 
 
+def create_tiles_with_metrics() -> None:  # noqa
+    """Export real tiles (with metrics) for the `clean` command to operate on."""
+    from histoslice import Slide, export_tiles
+    from histoslice.tiles import tile_regions
+
+    slide = Slide(SLIDE_PATH_JPEG)
+    regions = tile_regions(slide.dimensions, 256, overlap=0.0, out_of_bounds=False)
+    export_tiles(
+        slide,
+        regions,
+        TMP_DIRECTORY / slide.name,
+        tile_size=256,
+        save_metrics=True,
+        threshold=200,
+        save_thumbnails=False,
+    )
+
+
 def test_run(script_runner) -> None:  # noqa
     # Use uv run histoslice to ensure proper environment
     clean_temporary_directory()
@@ -34,7 +52,6 @@ def test_run(script_runner) -> None:  # noqa
     assert ret.success
     assert sorted([x.name for x in (TMP_DIRECTORY / "slide").iterdir()]) == sorted(
         [
-            "properties.json",
             f"thumbnail.{IMAGE_EXT}",
             f"thumbnail_tiles.{IMAGE_EXT}",
             f"thumbnail_tissue.{IMAGE_EXT}",
@@ -90,7 +107,6 @@ def test_overwrite(script_runner) -> None:  # noqa
     assert ret.success
     assert sorted([x.name for x in (TMP_DIRECTORY / "slide").iterdir()]) == sorted(
         [
-            "properties.json",
             f"thumbnail.{IMAGE_EXT}",
             f"thumbnail_tiles.{IMAGE_EXT}",
             f"thumbnail_tissue.{IMAGE_EXT}",
@@ -123,7 +139,6 @@ def test_unfinished(script_runner) -> None:  # noqa
     assert ret.success
     assert sorted([x.name for x in (TMP_DIRECTORY / "slide").iterdir()]) == sorted(
         [
-            "properties.json",
             f"thumbnail.{IMAGE_EXT}",
             f"thumbnail_tiles.{IMAGE_EXT}",
             f"thumbnail_tissue.{IMAGE_EXT}",
@@ -135,14 +150,14 @@ def test_unfinished(script_runner) -> None:  # noqa
 
 
 def test_run_with_error_multi_process(script_runner, monkeypatch) -> None:  # noqa
-    def mock_cut_slide(path, **kwargs):
+    def mock_slice_one(path, output_dir, kwargs):
         if "error_slide" in str(path):
-            return path, ValueError("Processing error")
-        from histoslice.cli._app import cut_slide as original_cut_slide
+            return path, ValueError("Processing error"), 0
+        from histoslice.cli import slice_one as original_slice_one
 
-        return original_cut_slide(path, **kwargs)
+        return original_slice_one(path, output_dir, kwargs)
 
-    monkeypatch.setattr("histoslice.cli._app.cut_slide", mock_cut_slide)
+    monkeypatch.setattr("histoslice.cli.slice_one", mock_slice_one)
 
     clean_temporary_directory()
     TMP_DIRECTORY.mkdir(parents=True, exist_ok=True)
@@ -169,14 +184,14 @@ def test_run_with_error_multi_process(script_runner, monkeypatch) -> None:  # no
 
 
 def test_run_with_error_single_process(script_runner, monkeypatch) -> None:  # noqa
-    def mock_cut_slide(path, **kwargs):
+    def mock_slice_one(path, output_dir, kwargs):
         if "error_slide" in str(path):
-            return path, ValueError("Processing error")
-        from histoslice.cli._app import cut_slide as original_cut_slide
+            return path, ValueError("Processing error"), 0
+        from histoslice.cli import slice_one as original_slice_one
 
-        return original_cut_slide(path, **kwargs)
+        return original_slice_one(path, output_dir, kwargs)
 
-    monkeypatch.setattr("histoslice.cli._app.cut_slide", mock_cut_slide)
+    monkeypatch.setattr("histoslice.cli.slice_one", mock_slice_one)
 
     clean_temporary_directory()
     TMP_DIRECTORY.mkdir(parents=True, exist_ok=True)
@@ -206,17 +221,8 @@ def test_clean_command_move(script_runner) -> None:  # noqa
     """Test clean command creates metadata_clean.parquet with is_outlier and method columns."""
     import polars as pl
 
-    from histoslice import SlideReader
-
     clean_temporary_directory()
-    # First, create tiles with metrics
-    reader = SlideReader(SLIDE_PATH_JPEG)
-    reader.save_regions(
-        TMP_DIRECTORY,
-        reader.get_tile_coordinates(None, 256, overlap=0.0),
-        save_metrics=True,
-        threshold=200,
-    )
+    create_tiles_with_metrics()
 
     # Count initial tiles (should be unchanged after clean)
     tiles_dir = TMP_DIRECTORY / "slide" / "tiles"
@@ -261,17 +267,8 @@ def test_clean_command_move(script_runner) -> None:  # noqa
 
 def test_clean_command_delete(script_runner) -> None:  # noqa
     """Test that the --delete flag is no longer accepted (removed from CLI)."""
-    from histoslice import SlideReader
-
     clean_temporary_directory()
-    # Create tiles with metrics
-    reader = SlideReader(SLIDE_PATH_JPEG)
-    reader.save_regions(
-        TMP_DIRECTORY,
-        reader.get_tile_coordinates(None, 256, overlap=0.0),
-        save_metrics=True,
-        threshold=200,
-    )
+    create_tiles_with_metrics()
 
     # Run clean command with --delete (should fail – option no longer exists)
     ret = script_runner.run(
@@ -319,17 +316,8 @@ def test_clean_command_no_metadata(script_runner) -> None:  # noqa
 
 def test_clean_command_invalid_mode(script_runner) -> None:  # noqa
     """Test clean command with invalid mode."""
-    from histoslice import SlideReader
-
     clean_temporary_directory()
-    # Create tiles with metrics
-    reader = SlideReader(SLIDE_PATH_JPEG)
-    reader.save_regions(
-        TMP_DIRECTORY,
-        reader.get_tile_coordinates(None, 256, overlap=0.0),
-        save_metrics=True,
-        threshold=200,
-    )
+    create_tiles_with_metrics()
 
     # Run clean command with invalid mode
     ret = script_runner.run(
@@ -383,17 +371,8 @@ def test_clean_command_unsupported_format(script_runner) -> None:  # noqa
 
 def test_clean_command_missing_tile_files(script_runner) -> None:  # noqa
     """Test clean command succeeds even when some tile files are missing."""
-    from histoslice import SlideReader
-
     clean_temporary_directory()
-    # Create tiles with metrics
-    reader = SlideReader(SLIDE_PATH_JPEG)
-    reader.save_regions(
-        TMP_DIRECTORY,
-        reader.get_tile_coordinates(None, 256, overlap=0.0),
-        save_metrics=True,
-        threshold=200,
-    )
+    create_tiles_with_metrics()
 
     # Delete multiple tile files to simulate a partially missing dataset
     tiles_dir = TMP_DIRECTORY / "slide" / "tiles"
@@ -427,17 +406,8 @@ def test_clean_command_missing_tile_files(script_runner) -> None:  # noqa
 
 def test_clean_command_exception_handling(script_runner, monkeypatch) -> None:  # noqa
     """Test clean command exception handling."""
-    from histoslice import SlideReader
-
     clean_temporary_directory()
-    # Create tiles with metrics
-    reader = SlideReader(SLIDE_PATH_JPEG)
-    reader.save_regions(
-        TMP_DIRECTORY,
-        reader.get_tile_coordinates(None, 256, overlap=0.0),
-        save_metrics=True,
-        threshold=200,
-    )
+    create_tiles_with_metrics()
 
     # Make the metadata file unreadable to trigger an exception
     metadata_file = TMP_DIRECTORY / "slide" / "metadata.parquet"
@@ -469,17 +439,8 @@ def test_clean_command_exception_handling(script_runner, monkeypatch) -> None:  
 
 def test_clean_command_no_outliers(script_runner) -> None:  # noqa
     """Test clean command when no outliers are detected."""
-    from histoslice import SlideReader
-
     clean_temporary_directory()
-    # Create tiles with metrics
-    reader = SlideReader(SLIDE_PATH_JPEG)
-    reader.save_regions(
-        TMP_DIRECTORY,
-        reader.get_tile_coordinates(None, 256, overlap=0.0),
-        save_metrics=True,
-        threshold=200,
-    )
+    create_tiles_with_metrics()
 
     # Run clean command with only 2 clusters (likely all tiles in one cluster)
     ret = script_runner.run(

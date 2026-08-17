@@ -5,11 +5,21 @@ from matplotlib.font_manager import fontManager
 from PIL import Image, ImageDraw, ImageFont
 
 from ._check import check_image
-from ._tiles import _divide_xywh
 
 ERROR_TEXT_ITEM_LENGTH = (
     "Length of text items ({}) does not match length of coordinates ({})."
 )
+
+
+def _divide_xywh(
+    xywh: tuple[int, int, int, int], divisor: Union[float, tuple[float, float]]
+) -> tuple[int, int, int, int]:
+    """Divide xywh-coordinates by a divisor."""
+    if not isinstance(divisor, (tuple, list)):
+        divisor = (divisor, divisor)
+    w_div, h_div = divisor
+    x, y, w, h = xywh
+    return round(x / w_div), round(y / h_div), round(w / w_div), round(h / h_div)
 
 
 def get_annotated_image(

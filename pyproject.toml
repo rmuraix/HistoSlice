@@ -38,8 +38,6 @@ dependencies = [
     "openslide-bin>=4.0.0.2",
     "typer>=0.16.0",
     "rich>=14.0.0",
-    "pydantic>=2.10.0",
-    "typer-di>=0.1.0",
 ]
 
 [project.urls]
@@ -50,7 +48,7 @@ Issues = "https://github.com/rmuraix/HistoSlice/issues"
 Changelog = "https://github.com/rmuraix/HistoSlice/releases"
 
 [project.scripts]
-histoslice = "histoslice.cli._app:main"
+histoslice = "histoslice.cli:main"
 
 [dependency-groups]
 dev = [

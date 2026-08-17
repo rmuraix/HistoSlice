@@ -5,14 +5,15 @@ __all__ = ["SlideReaderDataset", "TileImageDataset"]
 import ctypes
 import math
 import multiprocessing
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any, Optional, Union
 
 import numpy as np
 from PIL import Image
 
-from histoslice._reader import SlideReader
+from histoslice.slide import Slide as SlideReader
+from histoslice.tiles import Region
 
 try:
     from torch.utils.data import Dataset
@@ -34,15 +35,15 @@ class SlideReaderDataset(Dataset):
     def __init__(
         self,
         reader: SlideReader,
-        coordinates: Iterator[tuple[int, int, int, int]],
+        coordinates: Sequence[Region],
         level: int = 0,
         transform: Optional[Callable[[np.ndarray], Any]] = None,
     ) -> None:
         """Initialize SlideReaderDataset.
 
         Args:
-            reader: `SlideReader` instance.
-            coordinates: Iterator of xywh-coordinates.
+            reader: `Slide` instance.
+            coordinates: Sequence of `Region` instances.
             level: Slide level for reading tile image. Defaults to 0.
             transform: Transform function for tile images. Defaults to None.
 
@@ -63,11 +64,11 @@ class SlideReaderDataset(Dataset):
 
     def __getitem__(self, index: int) -> tuple[Union[np.ndarray, Any], np.ndarray]:
         self.__first_sample = False
-        xywh = self.coordinates[index]
-        tile = self.reader.read_region(xywh, level=self.level)
+        region = self.coordinates[index]
+        tile = self.reader.read_region(region, level=self.level)
         if self.transform is not None:
             tile = self.transform(tile)
-        return tile, np.array(xywh)
+        return tile, np.array(region.xywh)
 
 
 class TileImageDataset(Dataset):
