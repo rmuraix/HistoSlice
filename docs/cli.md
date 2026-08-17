@@ -1,9 +1,9 @@
 # Command Line Interface
 
-HistoSlice provides a powerful command-line interface (CLI) for preprocessing histological slide images. The CLI includes two main commands:
+HistoSlice provides a command-line interface (CLI) for preprocessing histological slide images. The CLI is a thin wrapper around the Python API - `histoslice slice` calls `histoslice.slice_slide()` for each matched file, and `histoslice clean` calls `OutlierDetector` on each matched output directory. It includes two commands:
 
 - **`slice`**: Extract tile images from histological slides
-- **`clean`**: Detect and remove outlier tile images using clustering
+- **`clean`**: Detect outlier tile images using clustering
 
 ## Installation
 
@@ -31,7 +31,7 @@ histoslice --help
 
 ### `slice` - Extract Tile Images
 
-Extract tile images from histological slides with tissue detection and configurable tiling parameters.
+Extract tile images from histological slides with tissue detection and configurable tiling parameters. Slides matching `--input` are processed in parallel (one process per slide, see `--num-workers`); see the [API documentation](api/public/slice_slide.md) if you need control over any individual step (tissue detection, tile grid, filtering, saving) instead.
 
 #### Usage
 
@@ -47,19 +47,16 @@ histoslice slice [OPTIONS]
 |--------|-------|------|---------|-------------|
 | `--input` | `-i` | TEXT | *required* | File pattern to glob (e.g., `'./slides/*.tiff'`). Supports wildcards for batch processing. |
 | `--output` | `-o` | DIRECTORY | *required* | Parent directory for all outputs. Will be created if it doesn't exist. |
-| `--mpp` | | FLOAT | from metadata | Microns per pixel (assumes square pixels). Overrides slide metadata. Used with `--target-mpp` for normalization. |
 
 ##### Tile Extraction
 
 | Option | Short | Type | Default | Description |
 |--------|-------|------|---------|-------------|
-| `--level` | `-l` | INTEGER | 0 | Pyramid level for tile extraction (0 = highest resolution). Must be ≥ 0. |
-| `--width` | `-w` | INTEGER | 640 | Tile width in pixels at target resolution. Must be ≥ 0. |
-| `--height` | `-h` | INTEGER | width | Tile height in pixels at target resolution. Defaults to same as width for square tiles. Must be ≥ 0. |
-| `--target-mpp` | | FLOAT | None | Target microns per pixel for normalization. Tiles will be scaled to achieve this resolution. Guarantees consistent physical scale and tensor dimensions. |
+| `--width` | `-w` | INTEGER | 512 | Tile size in pixels (square tiles). Must be ≥ 1. |
 | `--overlap` | `-n` | FLOAT | 0.0 | Overlap between neighbouring tiles as a fraction (0.0-1.0). E.g., 0.5 = 50% overlap. |
 | `--max-background` | `-b` | FLOAT | 0.75 | Maximum background ratio allowed in tiles (0.0-1.0). Tiles with more background are excluded. |
-| `--in-bounds` | | FLAG | False | If set, prevents tiles from going out-of-bounds of the slide. |
+| `--target-mpp` | | FLOAT | None | Target microns per pixel for the output tiles. If set, tiles are resampled to this physical resolution while staying `--width` pixels. |
+| `--mpp` | | FLOAT | from metadata | Microns per pixel override (assumes square pixels). Overrides slide metadata; required together with `--target-mpp` if the slide has no mpp metadata. |
 
 ##### Tissue Detection
 
@@ -67,22 +64,21 @@ histoslice slice [OPTIONS]
 |--------|-------|------|---------|-------------|
 | `--threshold` | `-t` | INTEGER | Otsu | Global thresholding value for tissue detection (0-255). If not specified, Otsu's method is used. |
 | `--multiplier` | `-x` | FLOAT | 1.05 | Multiplier for Otsu's threshold. Must be ≥ 0.0. Values > 1.0 increase sensitivity. |
-| `--tissue-level` | | INTEGER | max_dimension | Pyramid level for tissue detection. If not specified, determined by `--max-dimension`. |
-| `--max-dimension` | | INTEGER | 8192 | Maximum dimension for tissue detection. Lower values are faster but less precise. |
 | `--sigma` | | FLOAT | 1.0 | Sigma for Gaussian blurring before tissue detection. Must be ≥ 0.0. |
+| `--tissue-level` | | INTEGER | auto | Pyramid level for tissue detection. If not specified, the lowest-resolution level with both dimensions ≤ 4096px is picked automatically. |
 
 ##### Tile Saving
 
 | Option | Short | Type | Default | Description |
 |--------|-------|------|---------|-------------|
-| `--metrics` | | FLAG | False | Save image metrics (contrast, brightness, etc.) to metadata. Required for outlier detection. |
-| `--masks` | | FLAG | False | Save tissue masks as separate images. |
-| `--thumbnails` | | FLAG | False | Save thumbnail images of the slide with tissue overlay and tile grid. |
+| `--metrics` | | FLAG | False | Save image metrics (contrast, brightness, etc.) to metadata. Required for the `clean` command. |
+| `--masks` | | FLAG | False | Save per-tile tissue masks under a `masks/` subdirectory. |
+| `--thumbnails` | | FLAG | False | Save slide thumbnails: plain, with the tile grid overlay, and with the tissue mask overlay. |
 | `--overwrite` | `-z` | FLAG | False | Overwrite any existing slide outputs. |
-| `--unfinished` | `-u` | FLAG | False | Overwrite only if metadata is missing (incomplete previous run). |
-| `--image-format` | | TEXT | jpeg | File format for tile images (e.g., `jpeg`, `png`, `tiff`). If JPEG support is unavailable, output will use `png` regardless of this setting. |
+| `--unfinished` | `-u` | FLAG | False | Overwrite only slides whose previous run didn't finish (no `metadata.parquet`). |
+| `--image-format` | | TEXT | jpeg | File format for tile images (e.g., `jpeg`, `png`, `tiff`). If JPEG support is unavailable, output falls back to `png` regardless of this setting. |
 | `--quality` | | INTEGER | 80 | Quality for JPEG compression (0-100). Higher values = better quality but larger files. |
-| `--num-workers` | `-j` | INTEGER | CPU-count | Number of parallel workers for saving tiles. 0 = sequential processing. |
+| `--num-workers` | `-j` | INTEGER | CPU-count | Number of slides processed in parallel (one process per slide). `0` = sequential processing. |
 
 #### Examples
 
@@ -142,22 +138,19 @@ histoslice slice \
     --input './slides/*.svs' \
     --output ./tiles \
     --width 256 \
-    --height 256 \
     --multiplier 1.1 \
-    --max-dimension 4096 \
+    --tissue-level 3 \
     --sigma 2.0
 ```
 
-**Parallel processing with custom tile extraction:**
+**Parallel processing with a specific worker count:**
 
 ```bash
 histoslice slice \
     --input './slides/**/*.tiff' \
     --output ./output \
-    --level 1 \
     --width 512 \
     --overlap 0.25 \
-    --in-bounds \
     --num-workers 8
 ```
 
@@ -170,14 +163,15 @@ output/
 └── slide_name/
     ├── metadata.parquet          # Tile metadata (coordinates, metrics, etc.)
     ├── failures.json             # Per-tile failures (only written if any failures occur)
-    ├── properties.json           # Slide properties
     ├── thumbnail.jpeg            # Original slide thumbnail (if --thumbnails; .png if JPEG unsupported)
     ├── thumbnail_tiles.jpeg      # Thumbnail with tile grid (if --thumbnails; .png if JPEG unsupported)
     ├── thumbnail_tissue.jpeg     # Tissue mask thumbnail (if --thumbnails; .png if JPEG unsupported)
-    ├── mask.png                  # Tissue mask (if --masks)
+    ├── masks/                    # Per-tile tissue masks (if --masks)
+    │   ├── x0_y0_w512_h512.png
+    │   └── ...
     └── tiles/                    # Directory containing tile images
-        ├── tile_0000.jpeg        # Uses chosen image format (.png if JPEG unsupported)
-        ├── tile_0001.jpeg
+        ├── x0_y0_w512_h512.jpeg  # Uses chosen image format (.png if JPEG unsupported)
+        ├── x512_y0_w512_h512.jpeg
         └── ...
 ```
 
@@ -192,12 +186,12 @@ output/
 
 ---
 
-### `clean` - Remove Outlier Tiles
+### `clean` - Detect Outlier Tiles
 
-Detect and remove outlier tile images using k-means clustering on image metrics. This helps eliminate tiles with artifacts, poor tissue quality, or other anomalies.
+Detect outlier tile images using k-means clustering on image metrics. This writes a `metadata_clean.parquet` file next to `metadata.parquet` in each matched slide directory - the `slice`/`clean` commands never move or delete tile files themselves; use the extra `is_outlier` column to filter tiles downstream (e.g., when building your training dataset).
 
 !!! note "Prerequisite"
-    The `clean` command requires that tiles were extracted with the `--metrics` flag, as it uses image metrics for clustering.
+    The `clean` command requires that tiles were extracted with `--metrics`, as it uses image metrics for clustering.
 
 #### Usage
 
@@ -224,14 +218,13 @@ histoslice clean [OPTIONS]
 
 | Option | Short | Type | Default | Description |
 |--------|-------|------|---------|-------------|
-| `--delete` | `-d` | FLAG | False | Delete detected outlier images permanently. If not set, moves to `outliers/` subdirectory. |
-| `--num-workers` | `-j` | INTEGER | CPU-count | Number of parallel workers for processing multiple slides. 0 = sequential processing. |
+| `--num-workers` | `-j` | INTEGER | CPU-count | Number of slides processed in parallel. `0` = sequential processing. |
 
 #### How It Works
 
-1. **Clustering**: The command performs k-means clustering on tile image metrics (contrast, brightness, sharpness, etc.)
-2. **Outlier Identification**: Clusters are ordered by distance from the mean cluster center. Cluster 0 (most distant) is identified as outliers.
-3. **Action**: Outliers are either moved to an `outliers/` subdirectory (default) or deleted (with `--delete`).
+1. **Clustering**: The command performs k-means clustering on tile image metrics (contrast, brightness, sharpness, etc.) for each slide directory.
+2. **Outlier Identification**: Clusters are ordered by distance from the mean cluster center. Cluster 0 (most distant) is marked as outliers.
+3. **Output**: `metadata_clean.parquet` is written with all original columns plus `is_outlier` (bool) and `method` (the detection mode, e.g. `"clustering"`). Tile files on disk are left untouched.
 
 #### Examples
 
@@ -245,18 +238,9 @@ histoslice slice \
     --width 512 \
     --metrics
 
-# Then clean outliers (moves to outliers/ subdirectory)
+# Then detect outliers (writes metadata_clean.parquet per slide)
 histoslice clean \
     --input './tiles/*'
-```
-
-**Delete outliers instead of moving:**
-
-```bash
-histoslice clean \
-    --input './tiles/*' \
-    --num-clusters 4 \
-    --delete
 ```
 
 **Process specific slides:**
@@ -276,36 +260,28 @@ histoslice clean \
     --num-workers 8
 ```
 
-**Fine-tuned clustering:**
-
-```bash
-histoslice clean \
-    --input './output/**/*' \
-    --mode clustering \
-    --num-clusters 6 \
-    --num-workers 4
-```
-
 #### Output Structure
 
-After running the `clean` command with default settings (without `--delete`):
+After running the `clean` command:
 
 ```
 output/
 └── slide_name/
     ├── metadata.parquet
-    ├── properties.json
-    ├── tiles/
-    │   ├── tile_0002.jpeg        # Good tiles remain (extension matches output format)
-    │   ├── tile_0005.jpeg
-    │   └── ...
-    └── outliers/                 # Outlier tiles moved here
-        ├── tile_0000.jpeg
-        ├── tile_0003.jpeg
+    ├── metadata_clean.parquet    # original columns + is_outlier, method
+    └── tiles/                    # untouched
+        ├── x0_y0_w512_h512.jpeg
         └── ...
 ```
 
-With `--delete` flag, outlier tiles are permanently deleted instead of moved.
+To act on the outliers, filter `metadata_clean.parquet` yourself, e.g.:
+
+```python
+import polars as pl
+
+df = pl.read_parquet("./output/slide_name/metadata_clean.parquet")
+good_tiles = df.filter(~pl.col("is_outlier"))
+```
 
 ---
 
@@ -328,18 +304,13 @@ histoslice slice \
 # Step 2: Review thumbnails (check thumbnail_tiles.jpeg files)
 # Adjust parameters if needed and re-run with --overwrite
 
-# Step 3: Clean outliers from processed tiles
+# Step 3: Detect outliers in the processed tiles
 histoslice clean \
     --input './processed/*' \
     --num-clusters 4 \
     --num-workers 4
 
-# Step 4: Review outliers in outliers/ subdirectories
-# If satisfied, delete outliers:
-find ./processed -type d -name "outliers" -exec rm -rf {} +
-
-# Or re-run with --delete to skip manual review:
-# histoslice clean --input './processed/*' --num-clusters 4 --delete
+# Step 4: Filter out is_outlier==True rows when you build your training dataset
 ```
 
 ## Tips and Best Practices
@@ -357,19 +328,18 @@ find ./processed -type d -name "outliers" -exec rm -rf {} +
 
 - **Automatic thresholding**: Omit `--threshold` to use Otsu's method (works well for most slides).
 - **Fine-tune with multiplier**: Adjust `--multiplier` (e.g., 1.1 or 0.95) to increase/decrease sensitivity.
-- **Speed vs. accuracy**: Lower `--max-dimension` for faster processing, higher for more precise tissue detection.
+- **Speed vs. accuracy**: Set `--tissue-level` to a coarser pyramid level for faster processing, a finer one for more precise tissue detection.
 - **Blurring**: Increase `--sigma` for slides with noise or fine details that interfere with tissue detection.
 
 ### Outlier Detection
 
 - **Cluster count**: Start with `--num-clusters 4`, increase for more granular separation.
-- **Review before deleting**: Don't use `--delete` until you've verified outliers in the `outliers/` directory.
-- **Iterate**: You can run `clean` multiple times with different `--num-clusters` values.
-- **Manual curation**: For critical applications, manually review outliers before final deletion.
+- **Review before filtering**: Inspect `metadata_clean.parquet` (e.g., with `OutlierDetector`) before excluding tiles from training.
+- **Iterate**: You can run `clean` multiple times with different `--num-clusters` values; each run overwrites `metadata_clean.parquet`.
 
 ### Performance
 
-- **Parallel processing**: Use `--num-workers` to match your CPU count for faster processing.
+- **Parallel processing**: Use `--num-workers` to match your CPU count for faster processing. Parallelism is per-slide, not per-tile.
 - **Sequential for debugging**: Use `--num-workers 0` when debugging or for small datasets.
 - **JPEG quality**: Lower `--quality` (e.g., 70) reduces file size with minimal quality loss.
 - **Batch processing**: Use glob patterns to process multiple slides at once.
@@ -391,7 +361,6 @@ For very large slides or many tiles:
 - Reduce `--num-workers`
 - Increase `--max-background` to extract fewer tiles
 - Process slides individually instead of in batch
-- Use a higher `--level` to extract from a lower resolution
 
 ### No outliers detected
 
@@ -403,5 +372,5 @@ If `clean` reports no outliers:
 
 ## See Also
 
-- [API Documentation](api/public/slidereader/) - Python API for programmatic access
+- [API Documentation](api/public/slice_slide.md) - Python API for programmatic access
 - [Main Documentation](index.md) - Overview and Python examples

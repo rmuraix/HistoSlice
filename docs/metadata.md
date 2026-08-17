@@ -13,23 +13,19 @@ Metadata is collected when you use the `save_metrics=True` option in the CLI or 
 
 === "Python API"
     ```python
-    from histoslice import SlideReader
+    from histoslice import slice_slide
 
-    reader = SlideReader("./path/to/slide.tiff")
-    threshold, tissue_mask = reader.get_tissue_mask(level=-1)
-    tile_coordinates = reader.get_tile_coordinates(
-        tissue_mask, width=512, overlap=0.5, max_background=0.5
-    )
-    
-    # Save with metrics
-    metadata, failures = reader.save_regions(
+    result = slice_slide(
+        "./path/to/slide.tiff",
         "./tiles/",
-        tile_coordinates,
-        threshold=threshold,
+        tile_size=512,
+        overlap=0.5,
+        max_background=0.5,
         save_metrics=True,  # Enable metadata collection
     )
-    if failures:
-        print(f"Some tiles failed: {len(failures)}")
+    metadata = result.metadata
+    if result.failures:
+        print(f"Some tiles failed: {len(result.failures)}")
     ```
 
 ## Metadata Fields
@@ -245,5 +241,5 @@ brightest_tiles = metadata.sort("gray_mean", descending=True).head(10)
 
 ## Related Documentation
 
-- [API Reference](api/public/slidereader.md) - SlideReader API documentation
+- [API Reference](api/public/slice_slide.md) - `slice_slide` API documentation
 - [Outlier Detection](api/public/outlierdetector.md) - OutlierDetector for filtering tiles

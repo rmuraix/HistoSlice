@@ -38,7 +38,7 @@ pip install histoslice
 ## Usage
 
 > [!NOTE]
-> HistoSlice uses **pyvips** as the only slide backend. The `backend` argument is still accepted for compatibility, but it always resolves to pyvips.
+> HistoSlice reads slides through **pyvips**/libvips only - there is no backend to choose.
 >
 > If Pillow is built without JPEG support, HistoSlice will automatically save tiles/thumbnails as `.png`
 > and update filenames accordingly. Developers can check availability via `histoslice.functional.has_jpeg_support()`.
@@ -50,32 +50,37 @@ following:
 2. Preprocess smaller tile images by removing tiles with bad tissue, staining artifacts.
 
 ```bash
-histoslice --input './train_images/*.tiff' --output ./tiles --width 512 --overlap 0.5 --max-background 0.5 --backend pyvips --metrics --thumbnail
+histoslice slice --input './train_images/*.tiff' --output ./tiles --width 512 --overlap 0.5 --max-background 0.5 --metrics --thumbnails
 ```
 
-Or you can use the `HistoSlice` python API to do the same thing!
+Or use the `histoslice` Python API to do the same thing, one call for the common case:
 
 ```python
-from histoslice import SlideReader
+from histoslice import slice_slide
 
-# Read slide image.
-reader = SlideReader("./slides/slide_with_ink.jpeg")
-# Detect tissue.
-threshold, tissue_mask = reader.get_tissue_mask(level=-1)
-# Extract overlapping tile coordinates with less than 50% background.
-tile_coordinates = reader.get_tile_coordinates(
-    tissue_mask, width=512, overlap=0.5, max_background=0.5
-)
-# Save tile images with image metrics for preprocessing.
-tile_metadata, failures = reader.save_regions(
+result = slice_slide(
+    "./slides/slide_with_ink.jpeg",
     "./train_tiles/",
-    tile_coordinates,
-    threshold=threshold,
+    tile_size=512,
+    overlap=0.5,
+    max_background=0.5,
     save_metrics=True,
-    save_thumbnail=True
 )
-if failures:
-    print(f"Some tiles failed: {len(failures)}")
+if result.failures:
+    print(f"Some tiles failed: {len(result.failures)}")
+```
+
+...or compose the same pipeline yourself from its building blocks, when you need more
+control over any single step:
+
+```python
+from histoslice import Slide, tissue_mask, tile_regions, filter_by_tissue, export_tiles
+
+slide = Slide("./slides/slide_with_ink.jpeg")
+threshold, mask = tissue_mask(slide.read_level(-1))
+regions = tile_regions(slide.dimensions, size=512, overlap=0.5)
+regions = filter_by_tissue(regions, mask, slide_dimensions=slide.dimensions, max_background=0.5)
+result = export_tiles(slide, regions, "./train_tiles/", tile_size=512, threshold=threshold, save_metrics=True)
 ```
 
 Let's take a look at the output and visualise the thumbnails.
@@ -85,7 +90,6 @@ train_tiles
 └── slide_with_ink
     ├── metadata.parquet       # tile metadata
     ├── failures.json          # per-tile failures (only written if any failures occur)
-    ├── properties.json        # tile properties
     ├── thumbnail.jpeg         # thumbnail image (or .png if JPEG support is unavailable)
     ├── thumbnail_tiles.jpeg   # thumbnail with tiles (or .png if JPEG support is unavailable)
     ├── thumbnail_tissue.jpeg  # thumbnail of the tissue mask (or .png if JPEG support is unavailable)
@@ -104,15 +108,20 @@ let's try it out!
 from histoslice.utils import OutlierDetector
 
 # Let's wrap the tile metadata with a helper class.
-detector = OutlierDetector(tile_metadata)
+detector = OutlierDetector(result.metadata)
 # Cluster tiles based on image metrics.
 clusters = detector.cluster_kmeans(num_clusters=4, random_state=666)
-# Visualise first cluster.
-reader.get_annotated_thumbnail(
-    image=reader.read_level(-1), coordinates=detector.coordinates[clusters == 0]
-)
+# Visualise the first cluster.
+detector.random_image_collage(clusters == 0)
 ```
 
 ![Tiles in cluster 0](https://github.com/rmuraix/HistoSlice/raw/main/images/thumbnail_blue.jpeg)
 
-Now we can mark tiles in cluster `0` as outliers!
+Now we can mark tiles in cluster `0` as outliers! Or let the CLI do it for you:
+
+```bash
+histoslice clean --input './train_tiles/*' --num-clusters 4
+```
+
+This writes a `metadata_clean.parquet` next to `metadata.parquet`, with the original
+columns plus `is_outlier` (bool) and `method`.
