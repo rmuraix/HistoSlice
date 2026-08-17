@@ -5,6 +5,12 @@ real subprocess (`uv run histoslice ...`) - good for verifying the installed
 entry point, but coverage tooling can't see inside that separate process.
 These tests invoke the same `app` in-process to cover argument parsing,
 orchestration, and error handling directly.
+
+Multi-process (`-j` > 0) dispatch is intentionally NOT exercised here: it
+spawns real worker processes via `ProcessPoolExecutor`, which need to
+reconstruct pytest's own `__main__` entry point when run in-process. That is
+unreliable across Python versions/environments, so parallel dispatch is
+covered instead via real subprocess invocations in `tests/cli_test.py`.
 """
 
 import sys
@@ -28,6 +34,7 @@ from ._utils import (
     TMP_DIRECTORY,
     clean_temporary_directory,
     create_tiles_with_metrics,
+    make_bad_slide_dir,
 )
 
 runner = CliRunner()
@@ -38,17 +45,6 @@ def test_slice_command_sequential() -> None:
     result = runner.invoke(
         app,
         ["slice", "-i", str(SLIDE_PATH_JPEG), "-o", str(TMP_DIRECTORY), "-j", "0"],
-    )
-    assert result.exit_code == 0
-    assert (TMP_DIRECTORY / "slide" / "metadata.parquet").exists()
-    clean_temporary_directory()
-
-
-def test_slice_command_parallel() -> None:
-    clean_temporary_directory()
-    result = runner.invoke(
-        app,
-        ["slice", "-i", str(SLIDE_PATH_JPEG), "-o", str(TMP_DIRECTORY), "-j", "2"],
     )
     assert result.exit_code == 0
     assert (TMP_DIRECTORY / "slide" / "metadata.parquet").exists()
@@ -207,44 +203,21 @@ def test_clean_command_no_slide_dirs() -> None:
     assert result.exit_code == 1
 
 
-def test_clean_command_sequential_and_parallel() -> None:
+def test_clean_command_sequential() -> None:
     clean_temporary_directory()
     slide_dir = create_tiles_with_metrics()
 
     result = runner.invoke(app, ["clean", "-i", str(slide_dir), "-k", "2", "-j", "0"])
     assert result.exit_code == 0
     assert (slide_dir / "metadata_clean.parquet").exists()
-
-    result = runner.invoke(app, ["clean", "-i", str(slide_dir), "-k", "2", "-j", "2"])
-    assert result.exit_code == 0
     clean_temporary_directory()
-
-
-def _make_bad_slide_dir(name: str) -> None:
-    """A slide directory with metadata.parquet but no metric columns, so
-    `OutlierDetector` raises when `clean` processes it."""
-    bad_dir = TMP_DIRECTORY / name
-    bad_dir.mkdir(parents=True)
-    pl.DataFrame(
-        {"x": [0], "y": [0], "w": [1], "h": [1], "path": ["x.jpeg"]}
-    ).write_parquet(bad_dir / "metadata.parquet")
 
 
 def test_clean_command_reports_per_slide_exception_sequential() -> None:
     clean_temporary_directory()
     create_tiles_with_metrics()
-    _make_bad_slide_dir("bad")
+    make_bad_slide_dir("bad")
     result = runner.invoke(app, ["clean", "-i", str(TMP_DIRECTORY / "*"), "-j", "0"])
-    assert result.exit_code == 0
-    assert "Could not process" in result.output
-    clean_temporary_directory()
-
-
-def test_clean_command_reports_per_slide_exception_parallel() -> None:
-    clean_temporary_directory()
-    create_tiles_with_metrics()
-    _make_bad_slide_dir("bad")
-    result = runner.invoke(app, ["clean", "-i", str(TMP_DIRECTORY / "*"), "-j", "2"])
     assert result.exit_code == 0
     assert "Could not process" in result.output
     clean_temporary_directory()

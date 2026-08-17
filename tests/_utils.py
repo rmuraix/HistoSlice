@@ -2,6 +2,8 @@ import shutil
 import time
 from pathlib import Path
 
+import polars as pl
+
 from histoslice import Slide
 from histoslice.functional import has_jpeg_support
 
@@ -54,6 +56,18 @@ def create_tiles_with_metrics() -> Path:
         save_thumbnails=False,
     )
     return output_dir
+
+
+def make_bad_slide_dir(name: str) -> Path:
+    """A slide directory with metadata.parquet but no metric columns, so
+    `OutlierDetector` raises when `clean` processes it. Returns the directory.
+    """
+    bad_dir = TMP_DIRECTORY / name
+    bad_dir.mkdir(parents=True)
+    pl.DataFrame(
+        {"x": [0], "y": [0], "w": [1], "h": [1], "path": ["x.jpeg"]}
+    ).write_parquet(bad_dir / "metadata.parquet")
+    return bad_dir
 
 
 # Optional dependency flags and asset availability
