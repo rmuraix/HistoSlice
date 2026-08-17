@@ -176,9 +176,9 @@ output/
 ```
 
 !!! note
-    If Pillow lacks JPEG support in your environment, HistoSlice will write `.png` files
-    and update filenames accordingly. Developers can check support via
-    `histoslice.functional.has_jpeg_support()`.
+    If the underlying `libvips` build lacks JPEG support in your environment, HistoSlice
+    will write `.png` files and update filenames accordingly. Developers can check
+    support via `histoslice.functional.has_jpeg_support()`.
 
 !!! note
     If any tiles fail during extraction, the CLI prints a warning and writes

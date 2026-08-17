@@ -1,17 +1,17 @@
 import numpy as np
 import polars as pl
 import pytest
-from PIL import Image
+import pyvips
 
 from histoslice import Slide
 from histoslice.export import (
     ExportResult,
-    _pil_format,
     _resolve_image_format,
     _save_image,
     export_tiles,
 )
 from histoslice.functional import has_jpeg_support
+from histoslice.functional._imageio import read_image
 from histoslice.tiles import Region, tile_regions
 
 from ._utils import IMAGE_EXT, SLIDE_PATH_JPEG, TMP_DIRECTORY, clean_temporary_directory
@@ -58,7 +58,7 @@ def test_export_tiles_output_dimensions() -> None:
         save_thumbnails=False,
     )
     for path in result.metadata["path"]:
-        assert Image.open(path).size == (300, 300)
+        assert read_image(path).shape[:2] == (300, 300)
     clean_temporary_directory()
 
 
@@ -246,8 +246,8 @@ def test_export_tiles_png_thumbnails_are_downscaled() -> None:
         image_format="png",
         thumbnail_level=0,
     )
-    thumbnail = Image.open(result.output_dir / "thumbnail.png")
-    assert thumbnail.size[0] * thumbnail.size[1] <= 300_000
+    thumbnail = read_image(result.output_dir / "thumbnail.png")
+    assert thumbnail.shape[0] * thumbnail.shape[1] <= 300_000
     clean_temporary_directory()
 
 
@@ -259,31 +259,26 @@ def test_resolve_image_format_falls_back_to_png_without_jpeg_support(
     assert _resolve_image_format("tiff") == "tiff"
 
 
-def test_pil_format() -> None:
-    assert _pil_format("tif") == "TIFF"
-    assert _pil_format("tiff") == "TIFF"
-    assert _pil_format("bmp") == "BMP"
-
-
 def test_save_image_jpeg_conversion() -> None:
     if not has_jpeg_support():
-        pytest.skip("Pillow lacks JPEG support")
+        pytest.skip("libvips lacks JPEG support")
     clean_temporary_directory()
     TMP_DIRECTORY.mkdir(parents=True, exist_ok=True)
-    image = Image.fromarray(np.zeros((10, 10), dtype=np.uint8))
+    image = np.zeros((10, 10), dtype=np.uint8)
     output_path = TMP_DIRECTORY / "test.jpeg"
     _save_image(image, output_path, image_format="jpeg", quality=85)
-    saved = Image.open(output_path)
-    assert saved.format == "JPEG"
-    assert saved.mode == "RGB"
+    saved = pyvips.Image.new_from_file(str(output_path))
+    assert saved.get("vips-loader") == "jpegload"
+    assert saved.width == 10 and saved.height == 10
     clean_temporary_directory()
 
 
 def test_save_image_png() -> None:
     clean_temporary_directory()
     TMP_DIRECTORY.mkdir(parents=True, exist_ok=True)
-    image = Image.fromarray(np.zeros((10, 10, 3), dtype=np.uint8))
+    image = np.zeros((10, 10, 3), dtype=np.uint8)
     output_path = TMP_DIRECTORY / "test.png"
     _save_image(image, output_path, image_format="png", quality=85)
-    assert Image.open(output_path).format == "PNG"
+    saved = pyvips.Image.new_from_file(str(output_path))
+    assert saved.get("vips-loader") == "pngload"
     clean_temporary_directory()

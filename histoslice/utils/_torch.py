@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Any, Optional, Union
 
 import numpy as np
-from PIL import Image
 
+from histoslice.functional._imageio import read_image
 from histoslice.slide import Slide as SlideReader
 from histoslice.tiles import Region
 
@@ -126,11 +126,11 @@ class TileImageDataset(Dataset):
             path = str(path)
         if self._use_cache:
             if index not in self._cached_indices:
-                self._cache_array[index] = np.array(Image.open(path))
+                self._cache_array[index] = read_image(path)
                 self._cached_indices.add(index)
             image = self._cache_array[index]
         else:
-            image = np.array(Image.open(path))
+            image = read_image(path)
         if self.transform is not None:
             image = self.transform(image)
         labels = () if self.labels is None else self.labels[index]

@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Optional, Union
+from typing import Optional
 
 import cv2
 import numpy as np
-from PIL import Image
 
 from histoslice.functional._check import check_image
 from histoslice.functional._images import downscale_to_max_pixels
@@ -21,7 +20,7 @@ GRAY_NDIM = 2
 
 
 def tissue_mask(
-    image: Union[Image.Image, np.ndarray],
+    image: np.ndarray,
     *,
     threshold: Optional[int] = None,
     multiplier: float = 1.05,

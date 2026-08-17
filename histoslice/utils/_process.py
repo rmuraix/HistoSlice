@@ -7,7 +7,6 @@ from typing import Optional, Union
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
-from PIL import Image
 from sklearn.cluster import MiniBatchKMeans
 
 from histoslice.functional._images import (
@@ -133,7 +132,7 @@ class OutlierDetector:
         num_cols: int = 16,
         shape: tuple[int, int] = (64, 64),
         num_workers: int = 1,
-    ) -> Image.Image:
+    ) -> np.ndarray:
         """Generate a random collage from `paths[selection]`.
 
         Args:
