@@ -82,7 +82,7 @@ docs/                      # MkDocs documentation
 - `pyproject.toml` -- Python package configuration, dependencies, dev tools
 - `uv.lock` -- Locked dependency versions (like package-lock.json)
 - `mkdocs.yml` -- Documentation configuration
-- `AGENTS.md` -- Repository guidelines for agents/contributors
+- `CLAUDE.md` -- Repository guidelines for agents/contributors
 - `tests/data/` -- Sample slide images for testing (JPEG format)
 
 ### Development Workflow
