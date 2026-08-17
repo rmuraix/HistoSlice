@@ -1,11 +1,11 @@
 from unittest.mock import PropertyMock, patch
 
 import pytest
-from PIL import Image
 
 from histoslice import Slide, slice_slide
 from histoslice.api import mean_and_std
 from histoslice.export import ExportResult
+from histoslice.functional._imageio import read_image
 from histoslice.tiles import tile_regions
 
 from ._utils import SLIDE_PATH_JPEG, TMP_DIRECTORY, clean_temporary_directory
@@ -19,7 +19,7 @@ def test_slice_slide_native_resolution() -> None:
     assert isinstance(result, ExportResult)
     assert len(result.metadata) > 0
     for path in result.metadata["path"]:
-        assert Image.open(path).size == (512, 512)
+        assert read_image(path).shape[:2] == (512, 512)
     clean_temporary_directory()
 
 
@@ -37,7 +37,7 @@ def test_slice_slide_target_mpp_output_dimensions() -> None:
     )
     assert len(result.metadata) > 0
     for path in result.metadata["path"]:
-        assert Image.open(path).size == (256, 256)
+        assert read_image(path).shape[:2] == (256, 256)
     clean_temporary_directory()
 
 
@@ -54,7 +54,7 @@ def test_slice_slide_target_mpp_downscale() -> None:
         save_thumbnails=False,
     )
     for path in result.metadata["path"]:
-        assert Image.open(path).size == (256, 256)
+        assert read_image(path).shape[:2] == (256, 256)
     clean_temporary_directory()
 
 
@@ -70,7 +70,7 @@ def test_slice_slide_anisotropic_target_mpp() -> None:
         save_thumbnails=False,
     )
     for path in result.metadata["path"]:
-        assert Image.open(path).size == (256, 128)
+        assert read_image(path).shape[:2] == (128, 256)
     clean_temporary_directory()
 
 

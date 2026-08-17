@@ -7,9 +7,10 @@ from typing import Optional, Union
 
 import cv2
 import numpy as np
-from PIL import Image
 
 from ._concurrent import DEFAULT_START_METHOD
+from ._imageio import has_jpeg_support as _has_jpeg_support
+from ._imageio import read_image as _read_image_file
 
 
 def get_random_image_collage(
@@ -18,7 +19,7 @@ def get_random_image_collage(
     num_cols: int = 16,
     shape: tuple[int, int] = (64, 64),
     num_workers: int = 1,
-) -> Image.Image:
+) -> np.ndarray:
     """Create image collage from randomly sampled images from paths.
 
     Args:
@@ -61,7 +62,7 @@ def read_images_from_paths(
 
 def create_image_collage(
     images: list[np.ndarray], num_cols: int, shape: tuple[int, int]
-) -> Image.Image:
+) -> Optional[np.ndarray]:
     """Collect images into a collage.
 
     Args:
@@ -85,23 +86,19 @@ def create_image_collage(
     if len(row) > 0:
         row.extend([np.zeros_like(resized)] * (num_cols - len(row)))
         output.append(np.hstack(row))
-    return Image.fromarray(np.vstack(output))
+    return np.vstack(output)
 
 
 def has_jpeg_support() -> bool:
-    """Return True if Pillow has JPEG support enabled."""
-    try:
-        exts = Image.registered_extensions()
-    except Exception:
-        return False
-    return exts.get(".jpg") == "JPEG" or exts.get(".jpeg") == "JPEG"
+    """Return True if the underlying `libvips` build can save JPEG images."""
+    return _has_jpeg_support()
 
 
 def _read_image(path: Optional[str]) -> np.ndarray:
     """Parallisable."""
     if path is None:
         return None
-    return np.array(Image.open(path))
+    return _read_image_file(path)
 
 
 def downscale_to_max_pixels(

@@ -79,13 +79,13 @@ def test_metadata_no_metrics_fail() -> None:
 
 def test_metadata_plot_collage() -> None:
     metadata = OutlierDetector(generate_metadata(clean_tmp=False))
-    assert metadata.random_image_collage(~metadata.outliers, num_rows=4).size == (
-        1024,
+    assert metadata.random_image_collage(~metadata.outliers, num_rows=4).shape[:2] == (
         256,
-    )
-    assert metadata.random_image_collage(~metadata.outliers, num_rows=2).size == (
         1024,
+    )
+    assert metadata.random_image_collage(~metadata.outliers, num_rows=2).shape[:2] == (
         128,
+        1024,
     )
     with pytest.raises(ValueError, match="Empty selection"):
         metadata.random_image_collage(metadata.outliers)

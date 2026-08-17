@@ -1,8 +1,5 @@
-from typing import Union
-
 import cv2
 import numpy as np
-from PIL import Image
 
 from ._check import check_image
 
@@ -19,7 +16,7 @@ WHITE_PIXEL = 255
 
 
 def get_image_metrics(
-    image: Union[Image.Image, np.ndarray],
+    image: np.ndarray,
     tissue_mask: np.ndarray,
     quantiles: tuple[float, ...] = DEFAULT_QUANTILES,
     shape: tuple[int, int] = DEFAULT_SHAPE,

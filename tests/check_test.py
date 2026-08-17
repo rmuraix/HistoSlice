@@ -2,7 +2,6 @@
 
 import numpy as np
 import pytest
-from PIL import Image
 
 from histoslice.functional._check import check_image
 
@@ -16,13 +15,10 @@ def test_check_image_with_numpy_array() -> None:
     assert result.shape == (100, 100, 3)
 
 
-def test_check_image_with_pil_image() -> None:
-    """Test check_image with a PIL Image."""
-    pil_image = Image.new("RGB", (100, 100), color=(255, 0, 0))
-    result = check_image(pil_image)
-    assert isinstance(result, np.ndarray)
-    assert result.dtype == np.uint8
-    assert result.shape == (100, 100, 3)
+def test_check_image_rejects_non_array() -> None:
+    """Test check_image rejects non-numpy-array input (e.g. a PIL Image)."""
+    with pytest.raises(TypeError, match="Expected a numpy array image"):
+        check_image(object())
 
 
 def test_check_image_with_grayscale() -> None:
@@ -36,7 +32,7 @@ def test_check_image_with_grayscale() -> None:
 
 def test_check_image_invalid_type() -> None:
     """Test check_image raises TypeError with invalid type."""
-    with pytest.raises(TypeError, match="Expected an array image"):
+    with pytest.raises(TypeError, match="Expected a numpy array image"):
         check_image("not an image")  # type: ignore
 
 

@@ -4,7 +4,7 @@ Convention used throughout this module (and the rest of `histoslice`):
     * `dimensions` (whole slide / pyramid level shapes) are `(height, width)`,
       matching `numpy.ndarray.shape`.
     * `size` (a single tile/region size) is `(width, height)`, matching the
-      `PIL`/`OpenCV` convention. `Region` fields follow the same `x, y, width,
+      `OpenCV` convention. `Region` fields follow the same `x, y, width,
       height` order.
 """
 

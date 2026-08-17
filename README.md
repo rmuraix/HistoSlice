@@ -40,8 +40,9 @@ pip install histoslice
 > [!NOTE]
 > HistoSlice reads slides through **pyvips**/libvips only - there is no backend to choose.
 >
-> If Pillow is built without JPEG support, HistoSlice will automatically save tiles/thumbnails as `.png`
-> and update filenames accordingly. Developers can check availability via `histoslice.functional.has_jpeg_support()`.
+> If the underlying `libvips` build lacks JPEG support, HistoSlice will automatically save
+> tiles/thumbnails as `.png` and update filenames accordingly. Developers can check
+> availability via `histoslice.functional.has_jpeg_support()`.
 
 Typical workflow for training deep learning models with histological images is the
 following:

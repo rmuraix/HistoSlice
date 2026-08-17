@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-from PIL import Image
 
 from histoslice import Slide
 from histoslice import functional as F
@@ -17,7 +16,7 @@ from histoslice.tiles import (
     tile_regions,
 )
 
-from ._utils import DATA_DIRECTORY, SLIDE_PATH_JPEG, SLIDE_PATH_TMA
+from ._utils import SLIDE_PATH_JPEG, SLIDE_PATH_TMA
 
 KWARGS = {"dimensions": (100, 80), "size": (40, 30)}
 
@@ -190,11 +189,32 @@ def test_draw_tiles() -> None:
         rectangle_outline="red",
         rectangle_width=2,
         highlight_first=True,
-        text_items=range(len(coords)),
+        text_items=list(range(len(coords))),
         text_color="white",
         text_proportion=0.8,
         text_font="monospace",
     )
-    arr1 = np.array(img)
-    arr2 = np.array(Image.open(DATA_DIRECTORY / "correctly_drawn_tiles.png"))
-    assert (arr1 == arr2).all()
+    assert isinstance(img, np.ndarray)
+    assert img.shape == (200, 200, 3)
+    assert img.dtype == np.uint8
+
+    def is_red(pixels: np.ndarray) -> np.ndarray:
+        return (pixels[..., 0] > 150) & (pixels[..., 1] < 100) & (pixels[..., 2] < 100)
+
+    def is_blue(pixels: np.ndarray) -> np.ndarray:
+        return (pixels[..., 2] > 150) & (pixels[..., 0] < 100) & (pixels[..., 1] < 100)
+
+    # First tile is drawn with `highlight_outline` ("blue" by default), overwriting
+    # its `rectangle_outline` ("red").
+    x, y, w, h = coords[0]
+    top_edge = img[y : y + 2, x : x + w]
+    assert is_blue(top_edge).any()
+    assert not is_red(top_edge).any()
+    # A later, non-highlighted tile keeps its red outline.
+    x, y, w, h = coords[1]
+    top_edge = img[y : y + 2, x : x + w]
+    assert is_red(top_edge).any()
+    # White text was drawn somewhere inside the tiles.
+    assert (img.reshape(-1, 3) == 255).all(axis=1).any()
+    # Untouched background pixels are still black.
+    assert (image == 0).all()

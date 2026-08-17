@@ -12,9 +12,9 @@ import cv2
 import numpy as np
 import polars as pl
 import tqdm
-from PIL import Image
 
 from histoslice.functional._draw import get_annotated_image
+from histoslice.functional._imageio import write_image
 from histoslice.functional._images import downscale_to_max_pixels, has_jpeg_support
 from histoslice.functional._metrics import get_image_metrics
 from histoslice.slide import Slide
@@ -151,7 +151,7 @@ def annotated_thumbnail(
     names: Optional[list[str]] = None,
     highlight_first: bool = False,
     linewidth: int = 1,
-) -> Image.Image:
+) -> np.ndarray:
     """Draw `regions` on top of a (thumbnail) `image`.
 
     Args:
@@ -199,9 +199,7 @@ def _save_tile(
     image_dir = output_dir / region_dir
     image_dir.mkdir(parents=True, exist_ok=True)
     image_path = image_dir / f"{filename}.{image_format}"
-    _save_image(
-        Image.fromarray(tile), image_path, image_format=image_format, quality=quality
-    )
+    _save_image(tile, image_path, image_format=image_format, quality=quality)
     row["path"] = str(image_path.resolve())
 
     if save_masks or save_metrics:
@@ -210,7 +208,7 @@ def _save_tile(
             mask_dir = output_dir / "masks"
             mask_dir.mkdir(parents=True, exist_ok=True)
             mask_path = mask_dir / f"{filename}.png"
-            Image.fromarray(mask).save(mask_path, format="PNG")
+            write_image(mask, mask_path, image_format="png")
             row["mask_path"] = str(mask_path.resolve())
         if save_metrics:
             row.update(get_image_metrics(image=tile, tissue_mask=mask))
@@ -237,7 +235,7 @@ def _save_thumbnails(
         thumbnail_small = downscale_to_max_pixels(thumbnail_small, max_pixels=300_000)
 
     _save_image(
-        Image.fromarray(thumbnail_small),
+        thumbnail_small,
         output_dir / f"thumbnail.{image_format}",
         image_format=image_format,
         quality=quality,
@@ -267,7 +265,7 @@ def _save_thumbnails(
                 interpolation=cv2.INTER_AREA,
             )
         _save_image(
-            Image.fromarray(255 - 255 * mask),
+            (255 - 255 * mask).astype(np.uint8),
             output_dir / f"thumbnail_tissue.{image_format}",
             image_format=image_format,
             quality=quality,
@@ -292,24 +290,7 @@ def _resolve_image_format(image_format: str) -> str:
     return fmt
 
 
-def _pil_format(image_format: str) -> str:
-    fmt = image_format.strip().lower()
-    if fmt in ("jpg", "jpeg"):
-        return "JPEG"
-    if fmt == "png":
-        return "PNG"
-    if fmt in ("tif", "tiff"):
-        return "TIFF"
-    return fmt.upper()
-
-
 def _save_image(
-    image: Image.Image, path: Path, *, image_format: str, quality: int
+    image: np.ndarray, path: Path, *, image_format: str, quality: int
 ) -> None:
-    fmt = image_format.strip().lower()
-    if fmt in ("jpg", "jpeg"):
-        image.convert("RGB").save(
-            path, format=_pil_format(image_format), quality=int(quality)
-        )
-        return
-    image.save(path, format=_pil_format(image_format))
+    write_image(image, path, image_format=image_format, quality=quality)

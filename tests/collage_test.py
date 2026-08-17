@@ -1,4 +1,4 @@
-from PIL import Image
+import numpy as np
 
 import histoslice.functional as F
 from histoslice import Slide, export_tiles
@@ -17,12 +17,12 @@ def test_image_collage() -> None:
     collage = F.get_random_image_collage(
         result.metadata["path"], num_rows=4, num_cols=8, shape=(32, 32)
     )
-    assert isinstance(collage, Image.Image)
-    assert collage.size == (8 * 32, 4 * 32)
+    assert isinstance(collage, np.ndarray)
+    assert collage.shape[:2] == (4 * 32, 8 * 32)
     # Not enough images for all rows.
     collage = F.get_random_image_collage(
         result.metadata["path"][:6], num_rows=4, num_cols=8, shape=(32, 32)
     )
-    assert isinstance(collage, Image.Image)
-    assert collage.size == (8 * 32, 1 * 32)
+    assert isinstance(collage, np.ndarray)
+    assert collage.shape[:2] == (1 * 32, 8 * 32)
     clean_temporary_directory()

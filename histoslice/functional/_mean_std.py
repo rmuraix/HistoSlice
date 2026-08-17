@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Union
 
 import numpy as np
-from PIL import Image
 
 from ._check import check_image
 from ._concurrent import DEFAULT_START_METHOD
+from ._imageio import read_image
 
 MEAN = tuple[float, ...]
 STD = tuple[float, ...]
@@ -75,7 +75,4 @@ def _get_mean_and_std(image: np.ndarray) -> tuple[MEAN, STD]:
 
 
 def _read_image(path: Union[str, Path]) -> np.ndarray:
-    img = Image.open(path)
-    if img.mode not in ("RGB", "L"):
-        img = img.convert("RGB")
-    return np.array(img)
+    return read_image(path)
