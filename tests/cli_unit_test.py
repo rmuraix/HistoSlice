@@ -24,7 +24,7 @@ from histoslice.cli import (
     app,
     filter_slide_paths,
     main,
-    process_slide_outliers,
+    process_slide_qc,
     slice_one,
 )
 from histoslice.slide import Slide
@@ -191,12 +191,6 @@ def test_filter_slide_paths_none_found_exits() -> None:
         )
 
 
-def test_clean_command_unknown_mode() -> None:
-    result = runner.invoke(app, ["clean", "-i", str(TMP_DIRECTORY), "--mode", "bogus"])
-    assert result.exit_code == 1
-    assert "Unknown mode" in result.output
-
-
 def test_clean_command_no_slide_dirs() -> None:
     clean_temporary_directory()
     result = runner.invoke(app, ["clean", "-i", str(TMP_DIRECTORY / "nothing")])
@@ -207,7 +201,7 @@ def test_clean_command_sequential() -> None:
     clean_temporary_directory()
     slide_dir = create_tiles_with_metrics()
 
-    result = runner.invoke(app, ["clean", "-i", str(slide_dir), "-k", "2", "-j", "0"])
+    result = runner.invoke(app, ["clean", "-i", str(slide_dir), "-j", "0"])
     assert result.exit_code == 0
     assert (slide_dir / "metadata_clean.parquet").exists()
     clean_temporary_directory()
@@ -223,25 +217,22 @@ def test_clean_command_reports_per_slide_exception_sequential() -> None:
     clean_temporary_directory()
 
 
-def test_process_slide_outliers_success() -> None:
+def test_process_slide_qc_success() -> None:
     clean_temporary_directory()
     slide_dir = create_tiles_with_metrics()
-    result_dir, exception = process_slide_outliers(
-        slide_dir, mode="clustering", num_clusters=2
-    )
+    result_dir, exception = process_slide_qc(slide_dir)
     assert result_dir == slide_dir
     assert exception is None
     df = pl.read_parquet(slide_dir / "metadata_clean.parquet")
     assert "is_outlier" in df.columns
+    assert "qc_status" in df.columns
     clean_temporary_directory()
 
 
-def test_process_slide_outliers_exception() -> None:
+def test_process_slide_qc_exception() -> None:
     clean_temporary_directory()
     TMP_DIRECTORY.mkdir(parents=True)
-    slide_dir, exception = process_slide_outliers(
-        TMP_DIRECTORY, mode="clustering", num_clusters=2
-    )
+    slide_dir, exception = process_slide_qc(TMP_DIRECTORY)
     assert isinstance(exception, Exception)
     clean_temporary_directory()
 

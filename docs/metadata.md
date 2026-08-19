@@ -4,10 +4,19 @@ This page documents all metadata fields that HistoSlice collects when processing
 
 ## Overview
 
-Metadata is collected when you use the `save_metrics=True` option in the CLI or API:
+`metadata.parquet` always contains coordinates, file paths, and a small set
+of **technical QC metrics** (see below) - these are cheap to compute and are
+what `histoslice clean` uses, no extra flag required. The much larger set of
+**exploratory image metrics** (RGB/HSV/grayscale statistics and quantiles)
+is only collected when you pass `save_metrics=True` (`--metrics` on the
+CLI):
 
 === "CLI"
     ```bash
+    # Technical QC metrics are always saved.
+    histoslice slice --input './images/*.tiff' --output ./tiles
+
+    # Add --metrics for the full exploratory metric set too.
     histoslice slice --input './images/*.tiff' --output ./tiles --metrics
     ```
 
@@ -21,7 +30,7 @@ Metadata is collected when you use the `save_metrics=True` option in the CLI or 
         tile_size=512,
         overlap=0.5,
         max_background=0.5,
-        save_metrics=True,  # Enable metadata collection
+        save_metrics=True,  # Also collect the full exploratory metric set
     )
     metadata = result.metadata
     if result.failures:
@@ -48,23 +57,41 @@ These fields define the location and dimensions of each tile in the original sli
 | `path` | `str` | Absolute file path to the saved tile image |
 | `mask_path` | `str` | Absolute file path to the tissue mask image (only present if `save_masks=True`) |
 
-### Image Quality Metrics
+### Technical QC Metrics (always saved)
 
-These metrics help identify problematic tiles that may need to be filtered out.
+These fields are always computed during `slice`, regardless of `save_metrics`/`--metrics` - they're what `histoslice clean` (`histoslice.qc.quality_control`) uses to flag technical failures. See [Quality Control](api/public/qc.md) and the [CLI reference](cli.md#clean-technical-quality-control) for how they're turned into `pass`/`warn`/`fail` decisions.
 
 | Field | Type | Range | Description |
 |-------|------|-------|-------------|
-| `background` | `float64` | 0.0 - 1.0 | Proportion of background (non-tissue) pixels in the tile. Higher values indicate more background. |
+| `background` | `float64` | 0.0 - 1.0 | Proportion of background (non-tissue) pixels in the tile. |
+| `dark_fraction` | `float64` | 0.0 - 1.0 | Proportion of near-black grayscale pixels (value ≤ 8). High values suggest a corrupted or blank-scan tile. |
+| `bright_fraction` | `float64` | 0.0 - 1.0 | Proportion of near-white grayscale pixels (value ≥ 247). High values suggest a blown-out/overexposed tile. |
+| `gray_std` | `float64` | 0.0+ | Whole-tile (full-resolution) grayscale standard deviation. Near-zero indicates a near-constant/corrupted image. |
+| `focus_score` | `float64` | 0.0+ | Laplacian variance restricted to an eroded "tissue core" mask, so the tissue/background boundary doesn't dominate the sharpness estimate. Higher is sharper. |
+| `tissue_brightness` | `float64` | 0.0 - 255.0 | Tissue-only median HSV value (brightness). |
+| `tissue_saturation` | `float64` | 0.0 - 255.0 | Tissue-only median HSV saturation. |
+| `tissue_contrast` | `float64` | 0.0+ | Tissue-only grayscale q90 - q10. |
+
+!!! note "Not a probability, not a biological signal"
+    None of these metrics - nor `qc_score` (added by `clean`) - are probabilities. A tile with unusual `tissue_brightness`/`tissue_saturation`/`tissue_contrast` is not automatically wrong; it may simply be a different, biologically valid tissue type (tumor, stroma, adipose, necrosis, mucin, ...). Only the absolute hard-fail rules (near-black/near-white/near-constant) mark a tile `is_outlier` by themselves - see [Quality Control](api/public/qc.md).
+
+### Image Quality Metrics (requires `--metrics`)
+
+These metrics are part of the full exploratory metric set (`save_metrics=True`) and, unlike the technical QC metrics above, help with open-ended exploration rather than automated QC decisions.
+
+| Field | Type | Range | Description |
+|-------|------|-------|-------------|
 | `black_pixels` | `float64` | 0.0 - 1.0 | Proportion of pure black pixels (value = 0). High values may indicate artifacts or scanning issues. |
 | `white_pixels` | `float64` | 0.0 - 1.0 | Proportion of pure white pixels (value = 255). High values may indicate overexposed areas or background. |
-| `laplacian_std` | `float64` | 0.0+ | Standard deviation of the Laplacian operator, measuring image sharpness. Higher values indicate sharper images. |
+| `laplacian_std` | `float64` | 0.0+ | Whole-tile (not tissue-restricted) standard deviation of the Laplacian operator. Higher values indicate sharper images; unlike `focus_score`, this is not restricted to a tissue core, so it's more sensitive to the tissue/background boundary. |
 
 !!! tip "Quality Filtering"
     Common filtering criteria:
-    
+
     - Filter tiles with `background > 0.5` (more than 50% background)
     - Filter tiles with `laplacian_std < 5.0` (out-of-focus or blurry)
     - Filter tiles with high `white_pixels` or `black_pixels` (artifacts)
+    - Prefer `histoslice clean` for automated, slide-relative QC instead of picking fixed thresholds yourself.
 
 ### Color Channel Statistics
 
@@ -96,8 +123,8 @@ Mean and standard deviation values for each color channel across multiple color 
 
 | Field | Type | Range | Description |
 |-------|------|-------|-------------|
-| `gray_mean` | `float64` | 0.0 - 255.0 | Mean value of the grayscale conversion |
-| `gray_std` | `float64` | 0.0+ | Standard deviation of the grayscale conversion |
+| `gray_mean` | `float64` | 0.0 - 255.0 | Mean value of the grayscale conversion, computed on a resized (64x64) image for speed |
+| `gray_std` | `float64` | 0.0+ | Same field as in [Technical QC Metrics](#technical-qc-metrics-always-saved) above (full-resolution, not resized) - listed here for completeness |
 
 ### Color Channel Quantiles
 
@@ -172,13 +199,15 @@ Quantile values (percentiles) for tissue pixels in each color channel. These are
 
 ## Total Metadata Fields
 
-When `save_metrics=True` is enabled, a total of **72 fields** are collected:
+By default (no `--metrics`), a total of **13 fields** are collected:
 
 - 4 coordinate fields (x, y, w, h)
 - 1-2 file path fields (path, and optionally mask_path)
-- 4 image quality metrics
-- 14 color channel statistics (mean/std for RGB, HSV, and grayscale)
-- 49 quantile values (7 quantiles × 7 channels)
+- 8 technical QC metrics
+
+When `save_metrics=True`/`--metrics` is also enabled, the full exploratory metric set is added on top - 4 image quality metrics, 14 color channel statistics, and 49 quantile values (67 fields), of which `background` and `gray_std` are shared with (and, for `gray_std`, superseded by - see the note above) the technical QC metrics rather than being new columns. That's 65 new fields, for **78 fields** total.
+
+After `histoslice clean`, `metadata_clean.parquet` adds 10 more QC result columns (`qc_status`, `qc_score`, `qc_reasons`, `qc_focus_z`, `qc_brightness_z`, `qc_saturation_z`, `qc_contrast_z`, `qc_method`, `is_outlier`, `needs_review`) on top of whatever `metadata.parquet` already had.
 
 ## Usage Examples
 
@@ -204,7 +233,29 @@ quality_tiles = metadata.filter(
 )
 ```
 
-### Using with OutlierDetector
+### Running Technical QC
+
+```python
+import polars as pl
+from histoslice.qc import quality_control
+
+metadata = pl.read_parquet("./tiles/slide_id/metadata.parquet")
+checked = quality_control(metadata)  # same as `histoslice clean`
+
+good_tiles = checked.filter(~pl.col("is_outlier"))       # drop clear technical failures
+reviewed = checked.filter(~pl.col("needs_review"))        # also drop tiles flagged for review
+print(checked.group_by("qc_status").len())
+```
+
+`is_outlier` only ever means a technical QC failure (corrupted, near-black,
+near-white, near-constant) - it is not set for tiles that are simply
+biologically or statistically unusual. See [Quality Control](api/public/qc.md).
+
+### Exploring Tile Metrics with OutlierDetector
+
+`OutlierDetector` (including `cluster_kmeans`) is for interactive
+exploration/visualisation of the full metric set (`save_metrics=True`), not
+for technical QC - use `quality_control` above for that.
 
 ```python
 from histoslice.utils import OutlierDetector
@@ -212,11 +263,11 @@ from histoslice.utils import OutlierDetector
 # Load metadata with OutlierDetector
 detector = OutlierDetector.from_parquet("./tiles/slide_id/metadata.parquet")
 
-# Add outlier criteria
+# Add custom selection criteria for exploration
 detector.add_outliers(detector["background"] > 0.5, desc="high background")
 detector.add_outliers(detector["laplacian_std"] < 5.0, desc="blurry")
 
-# Visualize outliers
+# Visualize
 detector.plot_histogram("laplacian_std", num_images=20)
 collage = detector.random_image_collage(~detector.outliers, num_rows=4)
 collage.show()
@@ -242,4 +293,5 @@ brightest_tiles = metadata.sort("gray_mean", descending=True).head(10)
 ## Related Documentation
 
 - [API Reference](api/public/slice_slide.md) - `slice_slide` API documentation
-- [Outlier Detection](api/public/outlierdetector.md) - OutlierDetector for filtering tiles
+- [Quality Control](api/public/qc.md) - `quality_control`/`QCConfig` (used by `histoslice clean`)
+- [Outlier Detection](api/public/outlierdetector.md) - `OutlierDetector` for exploring tile metrics

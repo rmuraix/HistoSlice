@@ -10,13 +10,14 @@ __all__ = [
     "export_tiles",
     "filter_by_tissue",
     "functional",
+    "qc",
     "slice_slide",
     "tile_regions",
     "tissue_mask",
     "utils",
 ]
 
-from histoslice import functional, utils
+from histoslice import functional, qc, utils
 from histoslice.api import slice_slide
 from histoslice.export import ExportResult, export_tiles
 from histoslice.slide import Slide

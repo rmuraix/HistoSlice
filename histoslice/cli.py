@@ -242,13 +242,6 @@ def clean_command(
             "--input", "-i", help="Directory pattern to glob for slide outputs."
         ),
     ],
-    mode: Annotated[
-        str, typer.Option("--mode", "-m", help="Outlier detection mode.")
-    ] = "clustering",
-    num_clusters: Annotated[
-        int,
-        typer.Option("--num-clusters", "-k", min=2, help="Number of k-means clusters."),
-    ] = 4,
     num_workers: Annotated[
         Optional[int],
         typer.Option(
@@ -260,10 +253,7 @@ def clean_command(
         ),
     ] = None,
 ) -> None:
-    """Detect outlier tile images using clustering and save metadata_clean.parquet."""
-    if mode != "clustering":
-        error(f"Unknown mode '{mode}'. Currently only 'clustering' is supported.")
-
+    """Run technical quality control on tiles and save metadata_clean.parquet."""
     slide_dirs = [
         Path(p)
         for p in glob.glob(input_pattern, recursive=True)
@@ -278,9 +268,7 @@ def clean_command(
     effective_workers = (os.cpu_count() or 1) if num_workers is None else num_workers
     if effective_workers == 0:
         for slide_dir in slide_dirs:
-            _, exception = process_slide_outliers(
-                slide_dir, mode=mode, num_clusters=num_clusters
-            )
+            _, exception = process_slide_qc(slide_dir)
             if exception is not None:
                 warning(
                     f"Could not process {slide_dir} due to exception: {exception!r}"
@@ -288,11 +276,9 @@ def clean_command(
     else:
         ctx = mp.get_context(DEFAULT_START_METHOD)
         with ProcessPoolExecutor(max_workers=effective_workers, mp_context=ctx) as pool:
-            func = functools.partial(
-                process_slide_outliers, mode=mode, num_clusters=num_clusters
-            )
             futures = {
-                pool.submit(func, slide_dir): slide_dir for slide_dir in slide_dirs
+                pool.submit(process_slide_qc, slide_dir): slide_dir
+                for slide_dir in slide_dirs
             }
             for future in tqdm(
                 as_completed(futures), desc="Cleaning slides", total=len(slide_dirs)
@@ -304,27 +290,20 @@ def clean_command(
                     )
 
 
-def process_slide_outliers(
-    slide_dir: Path, *, mode: str, num_clusters: int
-) -> tuple[Path, Optional[Exception]]:
-    """Detect outlier tiles for one slide directory and write metadata_clean.parquet.
+def process_slide_qc(slide_dir: Path) -> tuple[Path, Optional[Exception]]:
+    """Run technical QC for one slide directory and write metadata_clean.parquet.
 
-    Adds two columns to the existing `metadata.parquet`: `is_outlier` (bool) and
-    `method` (the detection mode used), saved as `metadata_clean.parquet`.
+    Adds QC columns (see `histoslice.qc.quality_control`) to the existing
+    `metadata.parquet`, saved as `metadata_clean.parquet`. `is_outlier` marks
+    clear technical failures; `needs_review` marks tiles worth a manual look
+    but kept by default.
     """
     import polars as pl
 
-    from histoslice.utils import OutlierDetector
+    from histoslice.qc import quality_control
 
     try:
-        detector = OutlierDetector.from_parquet(slide_dir / "metadata.parquet")
-        clusters = detector.cluster_kmeans(num_clusters=num_clusters)
-        # cluster_kmeans orders clusters by distance from the mean center, so
-        # cluster 0 is the most distant (likely outliers).
-        outlier_mask = clusters == 0
-        df = detector.dataframe.with_columns(
-            [pl.Series("is_outlier", outlier_mask), pl.lit(mode).alias("method")]
-        )
+        df = quality_control(pl.read_parquet(slide_dir / "metadata.parquet"))
         df.write_parquet(slide_dir / "metadata_clean.parquet")
         return slide_dir, None
     except Exception as e:  # noqa

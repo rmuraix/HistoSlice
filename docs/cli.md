@@ -1,9 +1,17 @@
 # Command Line Interface
 
-HistoSlice provides a command-line interface (CLI) for preprocessing histological slide images. The CLI is a thin wrapper around the Python API - `histoslice slice` calls `histoslice.slice_slide()` for each matched file, and `histoslice clean` calls `OutlierDetector` on each matched output directory. It includes two commands:
+HistoSlice provides a command-line interface (CLI) for preprocessing histological slide images. The CLI is a thin wrapper around the Python API - `histoslice slice` calls `histoslice.slice_slide()` for each matched file, and `histoslice clean` calls `histoslice.qc.quality_control()` on each matched output directory. It includes two commands:
 
 - **`slice`**: Extract tile images from histological slides
-- **`clean`**: Detect outlier tile images using clustering
+- **`clean`**: Run technical quality control (QC) on extracted tiles
+
+!!! note "`is_outlier` is a technical QC flag, not a biological one"
+    `clean` never flags tiles for being biologically unusual - tumor, stroma,
+    adipose, necrosis, and other genuinely different tissue types are all
+    valid. It only flags clear technical failures (corrupted/blank/blown-out
+    tiles) as `is_outlier`, plus slide-relative anomalies worth a manual look
+    as `needs_review`. **`needs_review` tiles are kept by default** - `clean`
+    never deletes or moves anything; filter `metadata_clean.parquet` yourself.
 
 ## Installation
 
@@ -71,7 +79,7 @@ histoslice slice [OPTIONS]
 
 | Option | Short | Type | Default | Description |
 |--------|-------|------|---------|-------------|
-| `--metrics` | | FLAG | False | Save image metrics (contrast, brightness, etc.) to metadata. Required for the `clean` command. |
+| `--metrics` | | FLAG | False | Save the full set of exploratory image metrics (contrast, brightness, quantiles, etc.) to metadata. Not required for `clean` - a small set of technical QC metrics is always saved regardless of this flag. |
 | `--masks` | | FLAG | False | Save per-tile tissue masks under a `masks/` subdirectory. |
 | `--thumbnails` | | FLAG | False | Save slide thumbnails: plain, with the tile grid overlay, and with the tissue mask overlay. |
 | `--overwrite` | `-z` | FLAG | False | Overwrite any existing slide outputs. |
@@ -186,12 +194,11 @@ output/
 
 ---
 
-### `clean` - Detect Outlier Tiles
+### `clean` - Technical Quality Control
 
-Detect outlier tile images using k-means clustering on image metrics. This writes a `metadata_clean.parquet` file next to `metadata.parquet` in each matched slide directory - the `slice`/`clean` commands never move or delete tile files themselves; use the extra `is_outlier` column to filter tiles downstream (e.g., when building your training dataset).
+Run technical QC on already-extracted tiles: flag tiles with clear technical failures (corrupted, blank, blown-out) and, when enough tiles exist to compare against, tiles that deviate strongly from the rest of the slide. This writes a `metadata_clean.parquet` file next to `metadata.parquet` in each matched slide directory - the `slice`/`clean` commands never move or delete tile files themselves; use the extra `qc_status`/`is_outlier`/`needs_review` columns to filter tiles downstream (e.g., when building your training dataset).
 
-!!! note "Prerequisite"
-    The `clean` command requires that tiles were extracted with `--metrics`, as it uses image metrics for clustering.
+`clean` works on any slide extracted with `slice` - it does not require `--metrics`, since a small set of technical QC metrics is always saved during extraction (see [Metadata Fields](metadata.md)).
 
 #### Usage
 
@@ -207,38 +214,36 @@ histoslice clean [OPTIONS]
 |--------|-------|------|---------|-------------|
 | `--input` | `-i` | TEXT | *required* | Directory pattern to glob for slide outputs (e.g., `'./tiles/*'` or `'./tiles/slide_*'`). Looks for directories containing `metadata.parquet`. |
 
-##### Outlier Detection
-
-| Option | Short | Type | Default | Description |
-|--------|-------|------|---------|-------------|
-| `--mode` | `-m` | TEXT | clustering | Outlier detection mode. Currently only `clustering` is supported. |
-| `--num-clusters` | `-k` | INTEGER | 4 | Number of clusters for k-means clustering. Must be ≥ 2. Cluster 0 contains detected outliers. |
-
 ##### Output
 
 | Option | Short | Type | Default | Description |
 |--------|-------|------|---------|-------------|
 | `--num-workers` | `-j` | INTEGER | CPU-count | Number of slides processed in parallel. `0` = sequential processing. |
 
+Threshold customization is not exposed on the CLI - pass a custom `histoslice.qc.QCConfig` to `histoslice.qc.quality_control()` directly if you need to tune it.
+
 #### How It Works
 
-1. **Clustering**: The command performs k-means clustering on tile image metrics (contrast, brightness, sharpness, etc.) for each slide directory.
-2. **Outlier Identification**: Clusters are ordered by distance from the mean cluster center. Cluster 0 (most distant) is marked as outliers.
-3. **Output**: `metadata_clean.parquet` is written with all original columns plus `is_outlier` (bool) and `method` (the detection mode, e.g. `"clustering"`). Tile files on disk are left untouched.
+Each tile gets a `qc_status` of `"pass"`, `"warn"`, or `"fail"`:
+
+1. **Hard rules** (`"fail"`, absolute thresholds, never slide-relative): a near-black tile (`dark_fraction >= 0.90`), a near-white/blown-out tile (`bright_fraction >= 0.995`), or a near-constant/corrupted tile (`gray_std <= 2.0`).
+2. **Soft, slide-relative rules** (`"warn"`), computed only when the slide has at least 32 reference tiles (non-failed tiles with ≥50% tissue) to compare against: a tile whose focus score is a robust z-score below -4 relative to the slide (`"possible_blur"`), or a tile where at least 2 of brightness/saturation/contrast are far from the slide's typical range (`"appearance_shift"`). A single unusual appearance metric does not warn - biologically distinct tissue (tumor, stroma, adipose, necrosis, mucin, ...) is expected to vary and is not by itself a technical problem.
+3. **Output**: `metadata_clean.parquet` is written with all original columns plus `qc_status`, `qc_score` (a relative severity score, not a probability), `qc_reasons` (list of triggered reasons), `qc_focus_z`/`qc_brightness_z`/`qc_saturation_z`/`qc_contrast_z`, `qc_method` (`"technical_qc_v1"`), `is_outlier` (`qc_status == "fail"`), and `needs_review` (`qc_status == "warn"`). Tile files on disk are left untouched.
+
+On a slide with only technically normal tiles, `is_outlier` is `False` for every tile - unlike the old k-means-based clustering, `clean` never forces a "worst" cluster to be treated as outliers.
 
 #### Examples
 
-**Basic usage - Detect outliers with default settings:**
+**Basic usage:**
 
 ```bash
-# First extract tiles with metrics
+# Extract tiles (technical QC metrics are always saved)
 histoslice slice \
     --input './slides/*.tiff' \
     --output ./tiles \
-    --width 512 \
-    --metrics
+    --width 512
 
-# Then detect outliers (writes metadata_clean.parquet per slide)
+# Run technical QC (writes metadata_clean.parquet per slide)
 histoslice clean \
     --input './tiles/*'
 ```
@@ -247,8 +252,7 @@ histoslice clean \
 
 ```bash
 histoslice clean \
-    --input './tiles/slide_0*' \
-    --num-clusters 5
+    --input './tiles/slide_0*'
 ```
 
 **Parallel processing of multiple slides:**
@@ -256,7 +260,6 @@ histoslice clean \
 ```bash
 histoslice clean \
     --input './tiles/*' \
-    --num-clusters 4 \
     --num-workers 8
 ```
 
@@ -268,19 +271,20 @@ After running the `clean` command:
 output/
 └── slide_name/
     ├── metadata.parquet
-    ├── metadata_clean.parquet    # original columns + is_outlier, method
+    ├── metadata_clean.parquet    # original columns + qc_status, qc_score, qc_reasons, is_outlier, needs_review, ...
     └── tiles/                    # untouched
         ├── x0_y0_w512_h512.jpeg
         └── ...
 ```
 
-To act on the outliers, filter `metadata_clean.parquet` yourself, e.g.:
+To act on the results, filter `metadata_clean.parquet` yourself, e.g.:
 
 ```python
 import polars as pl
 
 df = pl.read_parquet("./output/slide_name/metadata_clean.parquet")
-good_tiles = df.filter(~pl.col("is_outlier"))
+good_tiles = df.filter(~pl.col("is_outlier"))          # drop clear technical failures
+reviewed_tiles = df.filter(~pl.col("needs_review"))    # also drop tiles flagged for manual review
 ```
 
 ---
@@ -290,27 +294,26 @@ good_tiles = df.filter(~pl.col("is_outlier"))
 Here's a complete example workflow for processing histological slides:
 
 ```bash
-# Step 1: Extract tiles with metrics and thumbnails
+# Step 1: Extract tiles with thumbnails (technical QC metrics are always saved)
 histoslice slice \
     --input './raw_slides/*.tiff' \
     --output ./processed \
     --width 512 \
     --overlap 0.5 \
     --max-background 0.5 \
-    --metrics \
     --thumbnails \
     --num-workers 4
 
 # Step 2: Review thumbnails (check thumbnail_tiles.jpeg files)
 # Adjust parameters if needed and re-run with --overwrite
 
-# Step 3: Detect outliers in the processed tiles
+# Step 3: Run technical QC on the processed tiles
 histoslice clean \
     --input './processed/*' \
-    --num-clusters 4 \
     --num-workers 4
 
-# Step 4: Filter out is_outlier==True rows when you build your training dataset
+# Step 4: Filter out is_outlier==True (and, optionally, needs_review==True)
+# rows when you build your training dataset
 ```
 
 ## Tips and Best Practices
@@ -318,7 +321,7 @@ histoslice clean \
 ### Tile Extraction
 
 - **Start with defaults**: Use default parameters first, then adjust based on your needs.
-- **Use `--metrics`**: Always include `--metrics` if you plan to use the `clean` command later.
+- **`--metrics` is optional**: Only needed for the full exploratory metric set; `clean` works without it.
 - **Check thumbnails**: Use `--thumbnails` to visually verify tile placement and tissue detection.
 - **Optimize overlap**: Use `--overlap 0.5` for better coverage, but note this increases tile count.
 - **Adjust background threshold**: Lower `--max-background` (e.g., 0.5) for stricter tissue selection.
@@ -331,11 +334,12 @@ histoslice clean \
 - **Speed vs. accuracy**: Set `--tissue-level` to a coarser pyramid level for faster processing, a finer one for more precise tissue detection.
 - **Blurring**: Increase `--sigma` for slides with noise or fine details that interfere with tissue detection.
 
-### Outlier Detection
+### Quality Control
 
-- **Cluster count**: Start with `--num-clusters 4`, increase for more granular separation.
-- **Review before filtering**: Inspect `metadata_clean.parquet` (e.g., with `OutlierDetector`) before excluding tiles from training.
-- **Iterate**: You can run `clean` multiple times with different `--num-clusters` values; each run overwrites `metadata_clean.parquet`.
+- **Review before filtering**: Inspect `metadata_clean.parquet` and `qc_reasons` before excluding tiles from training.
+- **`needs_review` tiles are kept**: `clean` never deletes/moves tiles; decide yourself whether to drop `needs_review` rows.
+- **Few reference tiles**: Slides with fewer than 32 reference tiles only get the absolute hard-fail rules - `needs_review` will never be set for them.
+- **Custom thresholds**: Use `histoslice.qc.QCConfig` via the Python API if the defaults don't fit your data; the CLI intentionally exposes no threshold flags.
 
 ### Performance
 
@@ -362,13 +366,13 @@ For very large slides or many tiles:
 - Increase `--max-background` to extract fewer tiles
 - Process slides individually instead of in batch
 
-### No outliers detected
+### `clean` reports no failures/warnings
 
-If `clean` reports no outliers:
-
-- Ensure you used `--metrics` when extracting tiles
-- Try increasing `--num-clusters`
-- Verify `metadata.parquet` exists in slide directories
+This is expected and normal for a technically clean slide - unlike the old
+clustering-based approach, `clean` does not force any tile to be flagged.
+If you expected `needs_review` tiles and got none, check that the slide has
+at least 32 reference tiles (non-failed tiles with ≥50% tissue); below that,
+only the absolute hard-fail rules run.
 
 ## See Also
 

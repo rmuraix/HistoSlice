@@ -101,9 +101,25 @@ train_tiles
 ![Tissue mask](https://github.com/rmuraix/HistoSlice/raw/main/images/thumbnail_tissue.jpeg)
 ![Thumbnail with tiles](https://github.com/rmuraix/HistoSlice/raw/main/images/thumbnail_tiles.jpeg)
 
-As we can see from the above images, histological slide images often contain areas that
-we would not like to include into our training data. Might seem like a daunting task but
-let's try it out!
+As we can see from the above images, histological slide images often contain tiles with
+technical problems - corrupted reads, blown-out exposure, near-blank scans. Let's run
+technical quality control (QC) to flag those, without treating biologically unusual (but
+valid) tissue as a problem:
+
+```bash
+histoslice clean --input './train_tiles/*'
+```
+
+This writes a `metadata_clean.parquet` next to `metadata.parquet`, with the original
+columns plus `qc_status` (`"pass"`/`"warn"`/`"fail"`), `qc_score`, `qc_reasons`,
+`is_outlier` (clear technical failures, e.g. corrupted/near-black/near-white tiles), and
+`needs_review` (possible artifacts, kept by default - review before dropping).
+`is_outlier` is never set just because a tile looks biologically unusual (tumor, stroma,
+adipose, necrosis, mucin, ...) - see the [metadata reference](https://lab.rmurai.com/HistoSlice/metadata/)
+for details.
+
+For interactive exploration/visualisation of the full metric set (not technical QC), use
+`OutlierDetector`:
 
 ```python
 from histoslice.utils import OutlierDetector
@@ -117,12 +133,3 @@ detector.random_image_collage(clusters == 0)
 ```
 
 ![Tiles in cluster 0](https://github.com/rmuraix/HistoSlice/raw/main/images/thumbnail_blue.jpeg)
-
-Now we can mark tiles in cluster `0` as outliers! Or let the CLI do it for you:
-
-```bash
-histoslice clean --input './train_tiles/*' --num-clusters 4
-```
-
-This writes a `metadata_clean.parquet` next to `metadata.parquet`, with the original
-columns plus `is_outlier` (bool) and `method`.

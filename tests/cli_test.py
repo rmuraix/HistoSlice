@@ -233,7 +233,7 @@ def test_run_with_error_single_process(script_runner, monkeypatch) -> None:  # n
 
 
 def test_clean_command_move(script_runner) -> None:  # noqa
-    """Test clean command creates metadata_clean.parquet with is_outlier and method columns."""
+    """Test clean command creates metadata_clean.parquet with QC columns."""
     clean_temporary_directory()
     create_tiles_with_metrics()
 
@@ -252,8 +252,6 @@ def test_clean_command_move(script_runner) -> None:  # noqa
             "clean",
             "-i",
             str(TMP_DIRECTORY / "slide"),
-            "-k",
-            "4",
             "-j",
             "0",
         ]
@@ -265,12 +263,14 @@ def test_clean_command_move(script_runner) -> None:  # noqa
     clean_parquet = TMP_DIRECTORY / "slide" / "metadata_clean.parquet"
     assert clean_parquet.exists()
 
-    # Verify it contains is_outlier and method columns
+    # Verify it contains the QC columns
     df = pl.read_parquet(clean_parquet)
     assert "is_outlier" in df.columns
-    assert "method" in df.columns
-    assert df["method"].unique().to_list() == ["clustering"]
-    assert df["is_outlier"].any()
+    assert "needs_review" in df.columns
+    assert "qc_status" in df.columns
+    assert df["qc_method"].unique().to_list() == ["technical_qc_v1"]
+    assert (df["is_outlier"] == (df["qc_status"] == "fail")).all()
+    assert (df["needs_review"] == (df["qc_status"] == "warn")).all()
 
     # Tile files should be untouched
     assert len(list(tiles_dir.glob(f"*.{IMAGE_EXT}"))) == initial_tile_count
@@ -293,8 +293,6 @@ def test_clean_command_parallel(script_runner) -> None:  # noqa
             "clean",
             "-i",
             str(TMP_DIRECTORY / "slide"),
-            "-k",
-            "4",
             "-j",
             "2",
         ]
@@ -324,8 +322,6 @@ def test_clean_command_delete(script_runner) -> None:  # noqa
             "clean",
             "-i",
             str(TMP_DIRECTORY / "slide"),
-            "-k",
-            "4",
             "--delete",
             "-j",
             "0",
@@ -360,12 +356,12 @@ def test_clean_command_no_metadata(script_runner) -> None:  # noqa
     clean_temporary_directory()
 
 
-def test_clean_command_invalid_mode(script_runner) -> None:  # noqa
-    """Test clean command with invalid mode."""
+def test_clean_command_mode_option_removed(script_runner) -> None:  # noqa
+    """Test that the --mode/--num-clusters flags are no longer accepted (removed
+    together with k-means-based outlier detection)."""
     clean_temporary_directory()
     create_tiles_with_metrics()
 
-    # Run clean command with invalid mode
     ret = script_runner.run(
         [
             "uv",
@@ -376,13 +372,12 @@ def test_clean_command_invalid_mode(script_runner) -> None:  # noqa
             "-i",
             str(TMP_DIRECTORY / "slide"),
             "--mode",
-            "invalid_mode",
+            "clustering",
         ]
     )
 
-    # Should fail because of invalid mode
     assert not ret.success
-    assert "Unknown mode" in ret.stderr or "Unknown mode" in ret.stdout
+    assert "No such option" in ret.stderr or "no such option" in ret.stderr.lower()
 
     clean_temporary_directory()
 
@@ -439,8 +434,6 @@ def test_clean_command_missing_tile_files(script_runner) -> None:  # noqa
             "clean",
             "-i",
             str(TMP_DIRECTORY / "slide"),
-            "-k",
-            "4",
             "-j",
             "0",
         ]
@@ -513,12 +506,11 @@ def test_clean_command_reports_per_slide_exception_parallel(script_runner) -> No
     clean_temporary_directory()
 
 
-def test_clean_command_no_outliers(script_runner) -> None:  # noqa
-    """Test clean command when no outliers are detected."""
+def test_clean_command_basic_usage(script_runner) -> None:  # noqa
+    """`clean -i ...` with no other options is the whole basic usage surface."""
     clean_temporary_directory()
     create_tiles_with_metrics()
 
-    # Run clean command with only 2 clusters (likely all tiles in one cluster)
     ret = script_runner.run(
         [
             "uv",
@@ -528,16 +520,11 @@ def test_clean_command_no_outliers(script_runner) -> None:  # noqa
             "clean",
             "-i",
             str(TMP_DIRECTORY / "slide"),
-            "-k",
-            "2",
-            "-j",
-            "0",
         ]
     )
 
     assert ret.success
-    # The output should mention either detection or no outliers
-
-    clean_temporary_directory()
+    df = pl.read_parquet(TMP_DIRECTORY / "slide" / "metadata_clean.parquet")
+    assert set(df["qc_status"].unique().to_list()) <= {"pass", "warn", "fail"}
 
     clean_temporary_directory()

@@ -217,46 +217,39 @@ tiles
 
 ### Remove Bad Tiles
 
-Histological slide images often contain areas that we would not like to include into our training data. Might seem like a daunting task but let's try it out!
+Histological slide images often contain tiles with technical problems - corrupted reads, blown-out exposure, near-blank scans. `clean` flags those, without treating biologically unusual (but valid) tissue as a problem.
 
 === "CLI"
     ```bash
-    # First, extract tiles with metrics
+    # First, extract tiles (technical QC metrics are always saved, --metrics is optional)
     histoslice slice \
         --input './images/*.tiff' \
         --output ./tiles \
-        --width 512 \
-        --metrics
-    
-    # Then, detect outliers using clustering and save metadata_clean.parquet
+        --width 512
+
+    # Then, run technical QC and save metadata_clean.parquet
     # Specify the parent directory containing slide outputs
     histoslice clean \
-        --input './tiles/*' \
-        --num-clusters 4
-    
+        --input './tiles/*'
+
     # For parallel processing of multiple slides
     histoslice clean \
         --input './tiles/*' \
-        --num-clusters 4 \
         --num-workers 4
     ```
 
 === "Python API"
     ```python
-    from histoslice.utils import OutlierDetector
+    from histoslice.qc import quality_control
 
-    # Let's wrap the tile metadata with a helper class.
-    detector = OutlierDetector(result.metadata)
-    # Cluster tiles based on image metrics.
-    clusters = detector.cluster_kmeans(num_clusters=4, random_state=666)
-    # Visualise the first cluster.
-    detector.random_image_collage(clusters == 0)
+    # Run technical QC directly on the metadata.
+    checked = quality_control(result.metadata)
+    # "fail": clear technical failures, safe to drop.
+    outliers = checked.filter(checked["is_outlier"])
+    # "warn": possible technical artifacts, kept by default - review before dropping.
+    for_review = checked.filter(checked["needs_review"])
     ```
 
-Now we can mark tiles in cluster `0` as outliers!
+`clean` writes all original columns plus `qc_status` (`"pass"`/`"warn"`/`"fail"`), `qc_score`, `qc_reasons`, per-metric z-scores, `qc_method`, `is_outlier` (`qc_status == "fail"`) and `needs_review` (`qc_status == "warn"`) to `metadata_clean.parquet` in each slide directory. `is_outlier` only covers clear technical failures (corrupted/near-black/near-white/near-constant tiles) - it is **not** a biological or statistical rarity detector, and a technically clean slide can (and often will) have zero outliers. `needs_review` tiles are kept by default; the command supports parallel processing of multiple slides using the `--num-workers` option. See the [CLI documentation](cli.md#clean-technical-quality-control) for the full set of rules and thresholds.
 
-![Tiles in cluster 0](https://github.com/rmuraix/HistoSlice/blob/main/images/thumbnail_blue.jpeg?raw=true)
-
-The `clean` command automatically detects outliers in cluster 0 (the cluster most distant from the mean cluster center after k-means clustering orders them by distance) and saves a `metadata_clean.parquet` file in each slide directory. This file contains all original metric columns plus two extra columns: `is_outlier` (boolean) and `method` (the detection method used, e.g. `"clustering"`). The command supports parallel processing of multiple slides using the `--num-workers` option.
-
-For more information on how to use the `OutlierDetector`, see the [API documentation](api/public/outlierdetector/).
+For exploratory clustering of tile metrics (e.g. to visually browse a slide's tissue diversity, not for QC), see [`OutlierDetector.cluster_kmeans`](api/public/outlierdetector.md).

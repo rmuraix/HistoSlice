@@ -14,6 +14,12 @@ MAX_QUANTILE = 1.0
 BLACK_PIXEL = 0
 WHITE_PIXEL = 255
 
+DARK_PIXEL_THRESHOLD = 8
+BRIGHT_PIXEL_THRESHOLD = 247
+CORE_EROSION_KERNEL = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+CORE_EROSION_ITERATIONS = 2
+MIN_CORE_PIXELS = 50
+
 
 def get_image_metrics(
     image: np.ndarray,
@@ -83,6 +89,91 @@ def get_image_metrics(
             )
         )
     return metrics
+
+
+def get_qc_metrics(image: np.ndarray, tissue_mask: np.ndarray) -> dict[str, float]:
+    """Calculate minimal technical quality-control (QC) metrics for a tile.
+
+    Unlike `get_image_metrics`, which computes a large set of exploratory
+    channel statistics, this returns only the small set of metrics used by
+    `histoslice.qc.quality_control` to flag technical failures (corruption,
+    blown-out exposure, out-of-focus tiles) - see that module for how these
+    are turned into pass/warn/fail decisions. Cheap enough to compute for
+    every tile, regardless of whether full metrics are requested.
+
+    The following metrics are computed:
+        - `background`: fraction of non-tissue pixels.
+        - `dark_fraction` / `bright_fraction`: fraction of near-black /
+          near-white grayscale pixels.
+        - `gray_std`: whole-tile grayscale standard deviation (full
+          resolution, unlike the resized value in `get_image_metrics`).
+        - `focus_score`: Laplacian variance restricted to an eroded
+          "tissue core" mask, to avoid the tissue/background boundary
+          dominating the sharpness estimate.
+        - `tissue_brightness` / `tissue_saturation`: tissue-only median HSV
+          value/saturation.
+        - `tissue_contrast`: tissue-only grayscale q90 - q10.
+
+    Args:
+        image: Input image.
+        tissue_mask: Tissue mask (0=background, 1=tissue).
+
+    Returns:
+        Dictionary of QC metrics.
+    """
+    image = check_image(image)
+    if image.ndim > GRAYSCALE_NDIM:
+        gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+        hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+    else:
+        gray = image
+        hsv = None
+    tissue_selected = tissue_mask == 1
+    has_tissue = int(tissue_selected.sum()) >= MIN_TISSUE_PIXELS
+    tissue_gray = gray[tissue_selected] if has_tissue else gray.reshape(-1)
+
+    metrics = {
+        "background": round(float((tissue_mask == 0).sum() / tissue_mask.size), 3),
+        "dark_fraction": round(float(np.mean(gray <= DARK_PIXEL_THRESHOLD)), 3),
+        "bright_fraction": round(float(np.mean(gray >= BRIGHT_PIXEL_THRESHOLD)), 3),
+        "gray_std": round(float(gray.std()), 3),
+        "focus_score": get_focus_score(gray, tissue_mask),
+        "tissue_contrast": round(
+            float(np.quantile(tissue_gray, 0.9) - np.quantile(tissue_gray, 0.1)), 3
+        ),
+    }
+    if hsv is not None:
+        tissue_hsv = hsv[tissue_selected] if has_tissue else hsv.reshape(-1, 3)
+        metrics["tissue_brightness"] = round(float(np.median(tissue_hsv[:, 2])), 3)
+        metrics["tissue_saturation"] = round(float(np.median(tissue_hsv[:, 1])), 3)
+    else:
+        metrics["tissue_brightness"] = round(float(np.median(tissue_gray)), 3)
+        metrics["tissue_saturation"] = 0.0
+    return metrics
+
+
+def get_focus_score(gray: np.ndarray, tissue_mask: np.ndarray) -> float:
+    """Laplacian variance over an eroded tissue-core mask.
+
+    Restricting the Laplacian to a "core" mask (tissue mask eroded by a few
+    pixels) avoids the sharp tissue/background boundary itself dominating the
+    variance, which would make background-heavy tiles look artificially
+    sharp regardless of actual focus. Falls back to the full tissue mask (or
+    `0.0` if there isn't enough tissue at all) when erosion leaves too small
+    a core to measure.
+    """
+    core = cv2.erode(
+        tissue_mask.astype(np.uint8),
+        CORE_EROSION_KERNEL,
+        iterations=CORE_EROSION_ITERATIONS,
+    )
+    core_selected = core == 1
+    if int(core_selected.sum()) < MIN_CORE_PIXELS:
+        core_selected = tissue_mask == 1
+    if int(core_selected.sum()) < MIN_TISSUE_PIXELS:
+        return 0.0
+    laplacian = cv2.Laplacian(gray, cv2.CV_32F)
+    return round(float(laplacian[core_selected].var()), 3)
 
 
 def get_mean_and_std(image: np.ndarray, names: list[str]) -> dict[str, float]:

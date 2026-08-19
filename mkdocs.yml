@@ -46,6 +46,7 @@ nav:
     - Tissue Detection: api/public/tissue.md
     - Tile Regions: api/public/tiles.md
     - Export: api/public/export.md
+    - Quality Control: api/public/qc.md
     - OutlierDetector: api/public/outlierdetector.md
     - PyTorch Datasets: api/public/datasets.md
 plugins:

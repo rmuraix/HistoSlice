@@ -13,6 +13,7 @@ __all__ = [
     "get_image_metrics",
     "get_mean_and_std_from_images",
     "get_mean_and_std_from_paths",
+    "get_qc_metrics",
     "get_random_image_collage",
     "get_spot_coordinates",
     "get_tissue_mask",
@@ -26,4 +27,4 @@ from ._dearray import get_spot_coordinates
 from ._draw import get_annotated_image
 from ._images import get_random_image_collage, has_jpeg_support
 from ._mean_std import get_mean_and_std_from_images, get_mean_and_std_from_paths
-from ._metrics import get_image_metrics
+from ._metrics import get_image_metrics, get_qc_metrics

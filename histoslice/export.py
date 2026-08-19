@@ -16,7 +16,7 @@ import tqdm
 from histoslice.functional._draw import get_annotated_image
 from histoslice.functional._imageio import write_image
 from histoslice.functional._images import downscale_to_max_pixels, has_jpeg_support
-from histoslice.functional._metrics import get_image_metrics
+from histoslice.functional._metrics import get_image_metrics, get_qc_metrics
 from histoslice.slide import Slide
 from histoslice.tiles import Region, get_downsample
 from histoslice.tissue import downscale_for_thumbnail, tissue_mask as detect_tissue_mask
@@ -67,10 +67,15 @@ def export_tiles(
             `region_dir` thumbnail overlay text). Defaults to None.
         region_dir: Subdirectory tile images are saved to. Defaults to "tiles".
         threshold: Tissue detection threshold, required when `save_masks` or
-            `save_metrics` is True. Defaults to None.
+            `save_metrics` is True. When set (even if both are False), minimal
+            technical QC metrics (see `histoslice.functional.get_qc_metrics`)
+            are also computed and saved - these are what `histoslice clean`
+            needs, and don't require `save_metrics`. Defaults to None.
         tissue_mask: Tissue mask used for thumbnail visualisation. Defaults to None.
         save_masks: Save a tissue mask (`png`) alongside each tile. Defaults to False.
-        save_metrics: Save per-tile image metrics into the metadata. Defaults to False.
+        save_metrics: Save the full set of exploratory per-tile image metrics
+            into the metadata (see `histoslice.functional.get_image_metrics`).
+            Defaults to False.
         save_thumbnails: Save slide thumbnails (plain, annotated, and tissue mask
             overlay). Defaults to True.
         thumbnail_level: Pyramid level for thumbnails. If None, picked automatically.
@@ -202,7 +207,7 @@ def _save_tile(
     _save_image(tile, image_path, image_format=image_format, quality=quality)
     row["path"] = str(image_path.resolve())
 
-    if save_masks or save_metrics:
+    if save_masks or save_metrics or threshold is not None:
         __, mask = detect_tissue_mask(tile, threshold=threshold)
         if save_masks:
             mask_dir = output_dir / "masks"
@@ -212,6 +217,12 @@ def _save_tile(
             row["mask_path"] = str(mask_path.resolve())
         if save_metrics:
             row.update(get_image_metrics(image=tile, tissue_mask=mask))
+        # Minimal technical QC metrics are always computed (cheap, and
+        # required by `histoslice clean`), independent of `save_metrics`.
+        # Applied after `get_image_metrics` so its full-resolution `gray_std`
+        # (used by QC's low-dynamic-range check) wins over the resized value
+        # `get_image_metrics` computes for its own exploratory `gray_std`.
+        row.update(get_qc_metrics(image=tile, tissue_mask=mask))
     return row
 
 

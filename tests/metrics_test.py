@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 
 from histoslice import functional as F
@@ -71,3 +72,69 @@ def test_rgb_metrics() -> None:
         "saturation_q90": 255,
         "brightness_q90": 255,
     }
+
+
+def _textured_image(
+    shape: tuple[int, int] = (128, 128), *, seed: int = 0
+) -> np.ndarray:
+    """A grayscale image with real texture, so Laplacian variance is meaningful."""
+    rng = np.random.default_rng(seed)
+    return rng.integers(0, 256, size=shape, dtype=np.uint8)
+
+
+def test_qc_metrics_keys_and_background() -> None:
+    image = np.zeros((64, 64, 3), dtype=np.uint8) + 200
+    tissue_mask = np.zeros((64, 64), dtype=np.uint8)
+    tissue_mask[16:48, 16:48] = 1  # 25% tissue -> 75% background
+    metrics = F.get_qc_metrics(image, tissue_mask)
+    assert set(metrics) == {
+        "background",
+        "dark_fraction",
+        "bright_fraction",
+        "gray_std",
+        "focus_score",
+        "tissue_brightness",
+        "tissue_saturation",
+        "tissue_contrast",
+    }
+    assert metrics["background"] == 0.75
+
+
+def test_qc_metrics_dark_and_bright_fraction() -> None:
+    image = np.zeros((64, 64, 3), dtype=np.uint8)
+    image[:32, :, :] = 0  # near-black half
+    image[32:, :, :] = 255  # near-white half
+    tissue_mask = np.ones((64, 64), dtype=np.uint8)
+    metrics = F.get_qc_metrics(image, tissue_mask)
+    assert metrics["dark_fraction"] == 0.5
+    assert metrics["bright_fraction"] == 0.5
+
+
+def test_qc_metrics_grayscale_image_has_no_saturation() -> None:
+    image = _textured_image()
+    tissue_mask = np.ones(image.shape, dtype=np.uint8)
+    metrics = F.get_qc_metrics(image, tissue_mask)
+    assert metrics["tissue_saturation"] == 0.0
+    assert metrics["focus_score"] > 0
+
+
+def test_focus_score_no_tissue_is_safe() -> None:
+    image = _textured_image()
+    tissue_mask = np.zeros(image.shape, dtype=np.uint8)
+    assert F.get_qc_metrics(image, tissue_mask)["focus_score"] == 0.0
+
+
+def test_focus_score_blur_progression() -> None:
+    """Sharper images should have a strictly higher focus score than blurred
+    ones - the key regression test for using focus (not clustering) for QC."""
+    gray = _textured_image()
+    tissue_mask = np.ones(gray.shape, dtype=np.uint8)
+
+    original = F.get_qc_metrics(gray, tissue_mask)["focus_score"]
+    moderate_blur = cv2.GaussianBlur(gray, (9, 9), sigmaX=3.0)
+    severe_blur = cv2.GaussianBlur(gray, (25, 25), sigmaX=10.0)
+
+    moderate_score = F.get_qc_metrics(moderate_blur, tissue_mask)["focus_score"]
+    severe_score = F.get_qc_metrics(severe_blur, tissue_mask)["focus_score"]
+
+    assert original > moderate_score > severe_score

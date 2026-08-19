@@ -65,7 +65,21 @@ class OutlierDetector:
     @property
     def dataframe_without_metrics(self) -> pl.DataFrame:
         """Polars dataframe without metadata."""
-        forbidden = ["background", "black_pixels", "white_pixels", *self.metric_columns]
+        forbidden = [
+            "background",
+            "black_pixels",
+            "white_pixels",
+            # Minimal QC metrics (always saved, see `histoslice.qc`) that
+            # don't match the `_mean`/`_std`/`_q*` naming picked up by
+            # `metric_columns`.
+            "dark_fraction",
+            "bright_fraction",
+            "focus_score",
+            "tissue_brightness",
+            "tissue_saturation",
+            "tissue_contrast",
+            *self.metric_columns,
+        ]
         return self.dataframe[[x for x in self.dataframe.columns if x not in forbidden]]
 
     @property
