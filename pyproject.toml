@@ -53,7 +53,7 @@ histoslice = "histoslice.cli:main"
 dev = [
     "mkdocs-material==9.7.7",
     "mkdocstrings[python]==1.0.6",
-    "pytest==9.1.1",
+    "pytest==9.2.0",
     "pytest-console-scripts==1.4.1",
     "pytest-cov==7.1.0",
     "ruff==0.15.22",
